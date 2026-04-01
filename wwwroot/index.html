@@ -1,0 +1,2381 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Road Defect Detection System</title>
+    <style>
+        /* ============================================================
+           CSS VARIABLES & RESET
+           ============================================================ */
+        :root {
+            --bg-primary: #0a0e17;
+            --bg-secondary: #111827;
+            --bg-card: rgba(17, 24, 39, 0.7);
+            --bg-card-hover: rgba(25, 35, 55, 0.8);
+            --bg-glass: rgba(255,255,255,0.03);
+            --border-glass: rgba(255,255,255,0.08);
+            --accent: #00D4FF;
+            --accent-glow: rgba(0,212,255,0.3);
+            --accent-dim: rgba(0,212,255,0.15);
+            --danger: #FF6B6B;
+            --success: #00FF88;
+            --warning: #FFB800;
+            --text-primary: #F1F5F9;
+            --text-secondary: #94A3B8;
+            --text-dim: #64748B;
+            --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            --radius: 12px;
+            --radius-sm: 8px;
+            --radius-xs: 4px;
+            --shadow: 0 4px 24px rgba(0,0,0,0.3);
+            --shadow-lg: 0 8px 40px rgba(0,0,0,0.4);
+            --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html {
+            scroll-behavior: smooth;
+            scrollbar-width: thin;
+            scrollbar-color: var(--accent-dim) transparent;
+        }
+
+        body {
+            font-family: var(--font);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+            line-height: 1.6;
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--accent-dim);
+            border-radius: 3px;
+        }
+
+            ::-webkit-scrollbar-thumb:hover {
+                background: var(--accent);
+            }
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image: radial-gradient(circle at 1px 1px, rgba(255,255,255,0.03) 1px, transparent 0);
+            background-size: 40px 40px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* ── Animations ──────────────────────────────────────── */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeInRight {
+            from {
+                opacity: 0;
+                transform: translateX(30px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        @keyframes pulse {
+            0%,100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        @keyframes scanLine {
+            0% {
+                top: 0;
+            }
+
+            100% {
+                top: 100%;
+            }
+        }
+
+        @keyframes shimmer {
+            0% {
+                background-position: -200% 0;
+            }
+
+            100% {
+                background-position: 200% 0;
+            }
+        }
+
+        @keyframes toastIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes toastOut {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+
+            to {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+        }
+
+        @keyframes dotPulse {
+            0%,100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+
+            50% {
+                transform: scale(1.3);
+                opacity: 0.7;
+            }
+        }
+
+        .animate-in {
+            animation: fadeInUp 0.6s ease forwards;
+        }
+
+        .animate-delay-1 {
+            animation-delay: 0.1s;
+            opacity: 0;
+        }
+
+        .animate-delay-2 {
+            animation-delay: 0.2s;
+            opacity: 0;
+        }
+
+        .animate-delay-3 {
+            animation-delay: 0.3s;
+            opacity: 0;
+        }
+
+        .animate-delay-4 {
+            animation-delay: 0.4s;
+            opacity: 0;
+        }
+
+        /* ── Layout ──────────────────────────────────────────── */
+        .app-container {
+            position: relative;
+            z-index: 1;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 20px 28px;
+            background: var(--bg-card);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border-glass);
+            border-radius: var(--radius);
+            margin-bottom: 20px;
+            animation: fadeInUp 0.5s ease;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .header-icon {
+            width: 44px;
+            height: 44px;
+            background: linear-gradient(135deg,var(--accent),#0066FF);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+        }
+
+        .header-title {
+            font-size: 22px;
+            font-weight: 700;
+            background: linear-gradient(135deg,var(--text-primary),var(--accent));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .header-subtitle {
+            font-size: 13px;
+            color: var(--text-dim);
+            margin-top: 2px;
+        }
+
+        .health-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: var(--bg-glass);
+            border: 1px solid var(--border-glass);
+            border-radius: 20px;
+            font-size: 13px;
+            color: var(--text-secondary);
+            cursor: default;
+        }
+
+        .health-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--text-dim);
+            transition: var(--transition);
+        }
+
+            .health-dot.online {
+                background: var(--success);
+                box-shadow: 0 0 8px var(--success);
+                animation: dotPulse 2s infinite;
+            }
+
+            .health-dot.offline {
+                background: var(--danger);
+                box-shadow: 0 0 8px var(--danger);
+            }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        /* ── Glass Card ──────────────────────────────────────── */
+        .glass-card {
+            background: var(--bg-card);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border-glass);
+            border-radius: var(--radius);
+            overflow: hidden;
+            transition: var(--transition);
+        }
+
+            .glass-card:hover {
+                border-color: rgba(255,255,255,0.12);
+            }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border-glass);
+        }
+
+        .card-title {
+            font-size: 15px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .card-body {
+            padding: 20px;
+        }
+
+        /* ── Preview Section ─────────────────────────────────── */
+        .preview-section {
+            display: flex;
+            flex-direction: column;
+            min-height: 500px;
+        }
+
+        .canvas-container {
+            position: relative;
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            overflow: hidden;
+            min-height: 400px;
+            background: rgba(0,0,0,0.2);
+        }
+
+        .canvas-wrapper {
+            position: relative;
+            display: inline-block;
+            max-width: 100%;
+            max-height: 100%;
+            transition: transform 0.3s ease;
+        }
+
+        #detectionCanvas {
+            max-width: 100%;
+            max-height: 460px;
+            height: auto;
+            display: block;
+            border-radius: var(--radius-sm);
+        }
+
+        .canvas-placeholder {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            color: var(--text-dim);
+            padding: 40px;
+            text-align: center;
+        }
+
+        .canvas-placeholder-icon {
+            font-size: 48px;
+            opacity: 0.5;
+        }
+
+        .canvas-placeholder-text {
+            font-size: 14px;
+        }
+
+        .scan-line {
+            position: absolute;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg,transparent,var(--accent),transparent);
+            box-shadow: 0 0 15px var(--accent),0 0 30px var(--accent-glow);
+            pointer-events: none;
+            display: none;
+            z-index: 10;
+        }
+
+            .scan-line.active {
+                display: block;
+                animation: scanLine 2s linear infinite;
+            }
+
+        .zoom-controls {
+            display: flex;
+            gap: 4px;
+            position: absolute;
+            bottom: 12px;
+            right: 12px;
+            z-index: 5;
+        }
+
+        .zoom-btn {
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border-glass);
+            border-radius: var(--radius-xs);
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 16px;
+            transition: var(--transition);
+        }
+
+            .zoom-btn:hover {
+                background: rgba(0,212,255,0.2);
+                color: var(--accent);
+                border-color: var(--accent);
+            }
+
+        /* ── Video Player ────────────────────────────────────── */
+        #videoPlayer {
+            max-width: 100%;
+            max-height: 460px;
+            border-radius: var(--radius-sm);
+            display: none;
+            background: #000;
+        }
+
+        /* ── Results Panel ───────────────────────────────────── */
+        .results-section {
+            display: flex;
+            flex-direction: column;
+            max-height: calc(500px + 58px);
+        }
+
+        .results-body {
+            padding: 16px;
+            overflow-y: auto;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+
+        .stat-card {
+            background: var(--bg-glass);
+            border: 1px solid var(--border-glass);
+            border-radius: var(--radius-sm);
+            padding: 12px;
+            text-align: center;
+            transition: var(--transition);
+        }
+
+            .stat-card:hover {
+                border-color: var(--accent-dim);
+            }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--accent);
+            line-height: 1;
+        }
+
+            .stat-value.danger {
+                color: var(--danger);
+            }
+
+            .stat-value.success-color {
+                color: var(--success);
+            }
+
+        .stat-label {
+            font-size: 11px;
+            color: var(--text-dim);
+            margin-top: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* ── Detection Cards ─────────────────────────────────── */
+        .detection-card {
+            background: var(--bg-glass);
+            border: 1px solid var(--border-glass);
+            border-radius: var(--radius-sm);
+            padding: 12px;
+            cursor: pointer;
+            transition: var(--transition);
+            animation: fadeInRight 0.4s ease forwards;
+            opacity: 0;
+        }
+
+            .detection-card:hover {
+                background: var(--bg-card-hover);
+                border-color: var(--accent-dim);
+                transform: translateX(-4px);
+            }
+
+            .detection-card.highlighted {
+                border-color: var(--accent);
+                background: rgba(0,212,255,0.08);
+                box-shadow: 0 0 15px var(--accent-glow);
+            }
+
+        .detection-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .detection-problem {
+            font-size: 14px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .detection-index {
+            width: 22px;
+            height: 22px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            font-size: 11px;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        .detection-confidence-text {
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .confidence-bar {
+            height: 4px;
+            background: rgba(255,255,255,0.06);
+            border-radius: 2px;
+            overflow: hidden;
+            margin-bottom: 8px;
+        }
+
+        .confidence-fill {
+            height: 100%;
+            border-radius: 2px;
+            transition: width 1s ease;
+            width: 0;
+        }
+
+        .detection-meta {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            color: var(--text-dim);
+        }
+
+        .detection-coords {
+            font-size: 10px;
+            color: var(--text-dim);
+            margin-top: 6px;
+            padding-top: 6px;
+            border-top: 1px solid var(--border-glass);
+            display: none;
+            font-family: 'Courier New',monospace;
+        }
+
+        .detection-card.expanded .detection-coords {
+            display: block;
+        }
+
+        .no-detections {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+            text-align: center;
+            gap: 12px;
+            animation: fadeIn 0.5s ease;
+        }
+
+        .no-detections-icon {
+            font-size: 48px;
+        }
+
+        .no-detections-text {
+            font-size: 15px;
+            color: var(--success);
+            font-weight: 600;
+        }
+
+        .no-detections-sub {
+            font-size: 13px;
+            color: var(--text-dim);
+        }
+
+        .skeleton {
+            background: linear-gradient(90deg,var(--bg-glass) 25%,rgba(255,255,255,0.06) 50%,var(--bg-glass) 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: var(--radius-sm);
+        }
+
+        .skeleton-card {
+            height: 80px;
+            margin-bottom: 10px;
+        }
+
+        .skeleton-stat {
+            height: 64px;
+        }
+
+        .export-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            width: 100%;
+            padding: 10px;
+            background: var(--bg-glass);
+            border: 1px solid var(--border-glass);
+            border-radius: var(--radius-sm);
+            color: var(--text-secondary);
+            font-size: 13px;
+            cursor: pointer;
+            transition: var(--transition);
+            font-family: var(--font);
+        }
+
+            .export-btn:hover {
+                background: var(--accent-dim);
+                color: var(--accent);
+                border-color: var(--accent);
+            }
+
+        /* ── Upload Area ─────────────────────────────────────── */
+        .upload-section {
+            animation: fadeInUp 0.6s ease forwards;
+            animation-delay: 0.2s;
+            opacity: 0;
+        }
+
+        .upload-zone {
+            border: 2px dashed var(--border-glass);
+            border-radius: var(--radius);
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: var(--transition);
+            position: relative;
+            overflow: hidden;
+        }
+
+            .upload-zone:hover, .upload-zone.drag-over {
+                border-color: var(--accent);
+                background: var(--accent-dim);
+            }
+
+                .upload-zone.drag-over .upload-icon {
+                    transform: scale(1.2);
+                }
+
+        .upload-icon {
+            font-size: 42px;
+            margin-bottom: 12px;
+            transition: transform 0.3s ease;
+            display: block;
+        }
+
+        .upload-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .upload-subtitle {
+            font-size: 13px;
+            color: var(--text-dim);
+        }
+
+        .upload-formats {
+            display: inline-flex;
+            gap: 6px;
+            margin-top: 12px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .format-badge {
+            padding: 3px 10px;
+            background: var(--bg-glass);
+            border: 1px solid var(--border-glass);
+            border-radius: 12px;
+            font-size: 11px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        .upload-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 16px;
+            padding: 0 20px 20px;
+        }
+
+        .btn {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 20px;
+            border: none;
+            border-radius: var(--radius-sm);
+            font-family: var(--font);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            position: relative;
+            overflow: hidden;
+        }
+
+            .btn:disabled {
+                opacity: 0.4;
+                cursor: not-allowed;
+            }
+
+        .btn-primary {
+            background: linear-gradient(135deg,var(--accent),#0088CC);
+            color: #000;
+        }
+
+            .btn-primary:hover:not(:disabled) {
+                transform: translateY(-2px);
+                box-shadow: 0 4px 20px var(--accent-glow);
+            }
+
+        .btn-secondary {
+            background: var(--bg-glass);
+            border: 1px solid var(--border-glass);
+            color: var(--text-secondary);
+        }
+
+            .btn-secondary:hover:not(:disabled) {
+                background: var(--accent-dim);
+                border-color: var(--accent);
+                color: var(--accent);
+            }
+
+        .btn .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(0,0,0,0.2);
+            border-top-color: currentColor;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+            display: none;
+        }
+
+        .btn.loading .spinner {
+            display: block;
+        }
+
+        .btn.loading .btn-text {
+            display: none;
+        }
+
+        .file-info {
+            display: none;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 20px;
+            font-size: 13px;
+            color: var(--text-secondary);
+            border-top: 1px solid var(--border-glass);
+        }
+
+            .file-info.visible {
+                display: flex;
+            }
+
+        .file-info-icon {
+            font-size: 18px;
+        }
+
+        .file-info-details {
+            flex: 1;
+        }
+
+        .file-info-name {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .file-info-size {
+            font-size: 11px;
+            color: var(--text-dim);
+        }
+
+        .file-info-clear {
+            background: none;
+            border: none;
+            color: var(--text-dim);
+            cursor: pointer;
+            font-size: 18px;
+            padding: 4px;
+            transition: var(--transition);
+        }
+
+            .file-info-clear:hover {
+                color: var(--danger);
+            }
+
+        /* ── Thumbnails ──────────────────────────────────────── */
+        .thumbnails-section {
+            animation: fadeInUp 0.6s ease forwards;
+            animation-delay: 0.3s;
+            opacity: 0;
+            display: none;
+        }
+
+            .thumbnails-section.visible {
+                display: block;
+            }
+
+        .thumbnails-strip {
+            display: flex;
+            gap: 10px;
+            padding: 16px 20px;
+            overflow-x: auto;
+            scroll-snap-type: x mandatory;
+        }
+
+        .thumbnail-item {
+            position: relative;
+            width: 80px;
+            height: 80px;
+            flex-shrink: 0;
+            border-radius: var(--radius-sm);
+            overflow: hidden;
+            cursor: pointer;
+            border: 2px solid var(--border-glass);
+            transition: var(--transition);
+            scroll-snap-align: start;
+        }
+
+            .thumbnail-item:hover {
+                border-color: var(--text-dim);
+                transform: scale(1.05);
+            }
+
+            .thumbnail-item.active {
+                border-color: var(--accent);
+                box-shadow: 0 0 12px var(--accent-glow);
+            }
+
+            .thumbnail-item img {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+            }
+
+        .thumbnail-badge {
+            position: absolute;
+            top: -4px;
+            right: -4px;
+            min-width: 20px;
+            height: 20px;
+            background: var(--danger);
+            color: #fff;
+            font-size: 10px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+            padding: 0 5px;
+            display: none;
+            z-index: 2;
+        }
+
+            .thumbnail-badge.visible {
+                display: flex;
+            }
+
+            .thumbnail-badge.zero {
+                background: var(--success);
+            }
+
+        .thumbnail-name {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 2px 4px;
+            background: rgba(0,0,0,0.7);
+            font-size: 9px;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .batch-progress {
+            display: none;
+            padding: 0 20px 16px;
+        }
+
+            .batch-progress.visible {
+                display: block;
+            }
+
+        .progress-bar {
+            height: 4px;
+            background: rgba(255,255,255,0.06);
+            border-radius: 2px;
+            overflow: hidden;
+            margin-bottom: 6px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg,var(--accent),#0088CC);
+            border-radius: 2px;
+            transition: width 0.3s ease;
+            width: 0;
+        }
+
+        .progress-text {
+            font-size: 12px;
+            color: var(--text-dim);
+            text-align: center;
+        }
+
+        /* ── Toast ───────────────────────────────────────────── */
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            pointer-events: none;
+        }
+
+        .toast {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 14px 20px;
+            background: var(--bg-secondary);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border-glass);
+            border-radius: var(--radius-sm);
+            box-shadow: var(--shadow-lg);
+            font-size: 13px;
+            color: var(--text-primary);
+            pointer-events: auto;
+            animation: toastIn 0.3s ease;
+            min-width: 280px;
+            max-width: 400px;
+        }
+
+            .toast.removing {
+                animation: toastOut 0.3s ease forwards;
+            }
+
+        .toast-icon {
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+
+        .toast.success {
+            border-left: 3px solid var(--success);
+        }
+
+        .toast.error {
+            border-left: 3px solid var(--danger);
+        }
+
+        .toast.warning {
+            border-left: 3px solid var(--warning);
+        }
+
+        .toast.info {
+            border-left: 3px solid var(--accent);
+        }
+
+        /* ── Confidence Slider ───────────────────────────────── */
+        .confidence-setting {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 20px;
+            border-top: 1px solid var(--border-glass);
+            background: var(--bg-glass);
+        }
+
+            .confidence-setting label {
+                font-size: 13px;
+                font-weight: 600;
+                color: var(--text-secondary);
+                white-space: nowrap;
+                min-width: 100px;
+            }
+
+        .confidence-slider {
+            flex: 1;
+            -webkit-appearance: none;
+            appearance: none;
+            height: 6px;
+            background: rgba(255,255,255,0.08);
+            border-radius: 3px;
+            outline: none;
+            cursor: pointer;
+        }
+
+            .confidence-slider::-webkit-slider-thumb {
+                -webkit-appearance: none;
+                width: 18px;
+                height: 18px;
+                border-radius: 50%;
+                background: var(--accent);
+                cursor: pointer;
+                box-shadow: 0 0 8px var(--accent-glow);
+                transition: transform 0.2s;
+            }
+
+                .confidence-slider::-webkit-slider-thumb:hover {
+                    transform: scale(1.2);
+                }
+
+            .confidence-slider::-moz-range-thumb {
+                width: 18px;
+                height: 18px;
+                border-radius: 50%;
+                background: var(--accent);
+                cursor: pointer;
+                border: none;
+            }
+
+        .confidence-display {
+            min-width: 48px;
+            padding: 4px 10px;
+            background: rgba(0,212,255,0.1);
+            border: 1px solid var(--accent-dim);
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--accent);
+            text-align: center;
+            font-family: 'Courier New',monospace;
+        }
+
+        /* ── Mode Toggle ─────────────────────────────────────── */
+        .mode-toggle {
+            display: flex;
+            gap: 4px;
+            padding: 4px;
+            background: var(--bg-glass);
+            border: 1px solid var(--border-glass);
+            border-radius: 8px;
+        }
+
+        .mode-btn {
+            padding: 6px 16px;
+            border: none;
+            border-radius: 6px;
+            font-family: var(--font);
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-dim);
+            background: transparent;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+            .mode-btn:hover {
+                color: var(--text-secondary);
+            }
+
+            .mode-btn.active {
+                background: var(--accent-dim);
+                color: var(--accent);
+            }
+
+        /* ── Video Results ───────────────────────────────────── */
+        .video-info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .video-info-item {
+            background: var(--bg-glass);
+            border: 1px solid var(--border-glass);
+            border-radius: var(--radius-sm);
+            padding: 10px;
+            text-align: center;
+        }
+
+        .video-info-value {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        .video-info-label {
+            font-size: 10px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            margin-top: 2px;
+        }
+
+        .defect-summary {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .defect-summary-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            background: var(--bg-glass);
+            border: 1px solid var(--border-glass);
+            border-radius: 20px;
+            font-size: 12px;
+        }
+
+        .defect-summary-count {
+            font-weight: 700;
+            color: var(--danger);
+        }
+
+        .defect-summary-name {
+            color: var(--text-secondary);
+        }
+
+        .frame-timeline {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .frame-card {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            background: var(--bg-glass);
+            border: 1px solid var(--border-glass);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            transition: var(--transition);
+            animation: fadeInRight 0.3s ease forwards;
+            opacity: 0;
+        }
+
+            .frame-card:hover {
+                background: var(--bg-card-hover);
+                border-color: var(--accent-dim);
+            }
+
+            .frame-card.has-defects {
+                border-left: 3px solid var(--danger);
+            }
+
+            .frame-card.clean {
+                border-left: 3px solid var(--success);
+            }
+
+            .frame-card.active-frame {
+                background: rgba(0,212,255,0.1);
+                border-color: var(--accent);
+            }
+
+        .frame-timestamp {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--accent);
+            min-width: 60px;
+            font-family: 'Courier New',monospace;
+        }
+
+        .frame-info {
+            flex: 1;
+        }
+
+        .frame-defect-count {
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .frame-defect-list {
+            font-size: 11px;
+            color: var(--text-dim);
+            margin-top: 2px;
+        }
+
+        .frame-badge {
+            min-width: 28px;
+            height: 22px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 11px;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 0 6px;
+        }
+
+            .frame-badge.danger {
+                background: rgba(255,107,107,0.15);
+                color: var(--danger);
+            }
+
+            .frame-badge.success {
+                background: rgba(0,255,136,0.15);
+                color: var(--success);
+            }
+
+        /* ── Unique Defect Cards ─────────────────────────────── */
+        .unique-defect-card {
+            background: var(--bg-glass);
+            border: 1px solid var(--border-glass);
+            border-radius: var(--radius-sm);
+            padding: 10px;
+            cursor: pointer;
+            transition: var(--transition);
+            animation: fadeInRight 0.3s ease forwards;
+            opacity: 0;
+        }
+
+            .unique-defect-card:hover {
+                background: var(--bg-card-hover);
+                border-color: var(--accent-dim);
+                transform: translateX(-4px);
+            }
+
+        .unique-defect-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 6px;
+        }
+
+        .unique-defect-name {
+            font-size: 14px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .track-badge {
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 10px;
+            font-weight: 700;
+        }
+
+        .unique-defect-meta {
+            display: flex;
+            gap: 12px;
+            font-size: 11px;
+            color: var(--text-dim);
+            flex-wrap: wrap;
+        }
+
+        /* ── Video Settings ──────────────────────────────────── */
+        .video-settings {
+            display: flex;
+            gap: 12px;
+            padding: 12px 20px;
+            border-top: 1px solid var(--border-glass);
+            background: var(--bg-glass);
+            flex-wrap: wrap;
+        }
+
+        .video-setting {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex: 1;
+            min-width: 140px;
+        }
+
+            .video-setting label {
+                font-size: 12px;
+                font-weight: 600;
+                color: var(--text-secondary);
+                white-space: nowrap;
+            }
+
+            .video-setting input[type="number"] {
+                width: 70px;
+                padding: 4px 8px;
+                background: var(--bg-secondary);
+                border: 1px solid var(--border-glass);
+                border-radius: 6px;
+                color: var(--text-primary);
+                font-family: var(--font);
+                font-size: 13px;
+                text-align: center;
+            }
+
+                .video-setting input[type="number"]:focus {
+                    outline: none;
+                    border-color: var(--accent);
+                }
+
+        .video-progress {
+            display: none;
+            padding: 12px 20px;
+        }
+
+            .video-progress.visible {
+                display: block;
+            }
+
+        .video-progress-bar {
+            height: 6px;
+            background: rgba(255,255,255,0.06);
+            border-radius: 3px;
+            overflow: hidden;
+            margin-bottom: 8px;
+        }
+
+        .video-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg,var(--accent),#0088CC);
+            border-radius: 3px;
+            transition: width 0.3s ease;
+            width: 0;
+        }
+
+        .video-progress-text {
+            font-size: 12px;
+            color: var(--text-dim);
+            text-align: center;
+        }
+
+        /* ── Video Download Button ───────────────────────────── */
+        .download-video-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            width: 100%;
+            padding: 10px;
+            margin-top: 8px;
+            background: linear-gradient(135deg,var(--accent),#0088CC);
+            border: none;
+            border-radius: var(--radius-sm);
+            color: #000;
+            font-family: var(--font);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+            .download-video-btn:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 4px 20px var(--accent-glow);
+            }
+
+        /* ── Tabs for video results ──────────────────────────── */
+        .result-tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 12px;
+            padding: 4px;
+            background: var(--bg-glass);
+            border-radius: 8px;
+        }
+
+        .result-tab {
+            flex: 1;
+            padding: 6px 12px;
+            border: none;
+            border-radius: 6px;
+            font-family: var(--font);
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-dim);
+            background: transparent;
+            cursor: pointer;
+            transition: var(--transition);
+            text-align: center;
+        }
+
+            .result-tab:hover {
+                color: var(--text-secondary);
+            }
+
+            .result-tab.active {
+                background: var(--accent-dim);
+                color: var(--accent);
+            }
+
+        .tab-content {
+            display: none;
+        }
+
+            .tab-content.active {
+                display: block;
+            }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* ── Responsive ──────────────────────────────────────── */
+        @media (max-width:1024px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .results-section {
+                max-height: none;
+            }
+
+            #detectionCanvas, #videoPlayer {
+                max-height: 350px;
+            }
+        }
+
+        @media (max-width:768px) {
+            .app-container {
+                padding: 12px;
+            }
+
+            .header {
+                padding: 14px 16px;
+                flex-wrap: wrap;
+                gap: 10px;
+            }
+
+            .header-title {
+                font-size: 17px;
+            }
+
+            .upload-zone {
+                padding: 24px 16px;
+            }
+
+            .upload-actions {
+                flex-direction: column;
+            }
+
+            .video-info-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .canvas-container {
+                min-height: 250px;
+            }
+
+            #detectionCanvas, #videoPlayer {
+                max-height: 280px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="app-container">
+
+        <!-- HEADER -->
+        <header class="header">
+            <div class="header-left">
+                <div class="header-icon">🔍</div>
+                <div>
+                    <div class="header-title">Road Defect Detection System</div>
+                    <div class="header-subtitle">AI-Powered Road Surface Analysis</div>
+                </div>
+            </div>
+            <div class="health-indicator" id="healthIndicator">
+                <span class="health-dot" id="healthDot"></span>
+                <span id="healthText">Checking...</span>
+            </div>
+        </header>
+
+        <!-- MAIN GRID -->
+        <div class="main-grid">
+
+            <!-- PREVIEW -->
+            <div class="glass-card preview-section animate-in animate-delay-1">
+                <div class="card-header">
+                    <div class="card-title">
+                        <span id="previewTitle">🖼️ Image Preview</span>
+                    </div>
+                    <div class="zoom-controls" id="zoomControls" style="position:static;">
+                        <button class="zoom-btn" onclick="zoomIn()" title="Zoom In">+</button>
+                        <button class="zoom-btn" onclick="zoomOut()" title="Zoom Out">−</button>
+                        <button class="zoom-btn" onclick="zoomFit()" title="Fit">⊡</button>
+                    </div>
+                </div>
+                <div class="canvas-container" id="canvasContainer">
+                    <div class="scan-line" id="scanLine"></div>
+                    <div class="canvas-wrapper" id="canvasWrapper">
+                        <div class="canvas-placeholder" id="canvasPlaceholder">
+                            <span class="canvas-placeholder-icon">📷</span>
+                            <span class="canvas-placeholder-text">Upload an image to begin analysis</span>
+                        </div>
+                        <canvas id="detectionCanvas" style="display:none;"></canvas>
+                        <video id="videoPlayer" controls></video>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RESULTS -->
+            <div class="glass-card results-section animate-in animate-delay-2">
+                <div class="card-header">
+                    <div class="card-title">📊 Detection Results</div>
+                    <button class="export-btn" id="exportBtn" style="display:none; width:auto; flex:none; padding:6px 12px; font-size:12px;" onclick="exportReport()">
+                        📥 Export
+                    </button>
+                </div>
+                <div class="results-body" id="resultsBody">
+                    <div class="no-detections">
+                        <span class="no-detections-icon">📋</span>
+                        <span class="no-detections-sub">Results will appear here after detection</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- UPLOAD -->
+        <div class="glass-card upload-section animate-in animate-delay-3">
+            <div class="card-header">
+                <div class="card-title">📤 Upload</div>
+                <div class="mode-toggle">
+                    <button class="mode-btn active" id="modeImage" onclick="switchMode('image')">🖼️ Image</button>
+                    <button class="mode-btn" id="modeVideo" onclick="switchMode('video')">🎬 Video</button>
+                </div>
+            </div>
+            <div class="card-body" style="padding-bottom:0;">
+                <div class="upload-zone" id="uploadZone">
+                    <span class="upload-icon" id="uploadIcon">📁</span>
+                    <div class="upload-title" id="uploadTitle">Drag & Drop files here</div>
+                    <div class="upload-subtitle">or click to browse files</div>
+                    <div class="upload-formats" id="uploadFormats">
+                        <span class="format-badge">JPG</span><span class="format-badge">JPEG</span>
+                        <span class="format-badge">PNG</span><span class="format-badge">BMP</span>
+                        <span class="format-badge">Max 50MB</span>
+                    </div>
+                    <div class="upload-formats hidden" id="uploadFormatsVideo">
+                        <span class="format-badge">MP4</span><span class="format-badge">AVI</span>
+                        <span class="format-badge">MOV</span><span class="format-badge">MKV</span>
+                        <span class="format-badge">WEBM</span><span class="format-badge">Max 500MB</span>
+                    </div>
+                </div>
+                <input type="file" id="fileInput" accept=".jpg,.jpeg,.png,.bmp" multiple>
+                <input type="file" id="videoFileInput" accept=".mp4,.avi,.mov,.mkv,.wmv,.flv,.webm" style="display:none;">
+            </div>
+            <div class="file-info" id="fileInfo">
+                <span class="file-info-icon">🖼️</span>
+                <div class="file-info-details">
+                    <div class="file-info-name" id="fileName"></div>
+                    <div class="file-info-size" id="fileSize"></div>
+                </div>
+                <button class="file-info-clear" onclick="clearFiles()" title="Clear">✕</button>
+            </div>
+            <div class="confidence-setting">
+                <label for="confidenceSlider">🎯 Confidence:</label>
+                <input type="range" id="confidenceSlider" class="confidence-slider" min="0" max="100" value="15" oninput="updateConfidenceDisplay()">
+                <span class="confidence-display" id="confidenceDisplay">15%</span>
+            </div>
+            <div class="video-settings hidden" id="videoSettings">
+                <div class="video-setting">
+                    <label>🎞️ Frame Interval:</label>
+                    <input type="number" id="frameIntervalInput" value="30" min="1" max="1000">
+                </div>
+                <div class="video-setting">
+                    <label>📊 Max Frames:</label>
+                    <input type="number" id="maxFramesInput" value="120" min="1" max="1000">
+                </div>
+            </div>
+            <div class="video-progress" id="videoProgress">
+                <div class="video-progress-bar"><div class="video-progress-fill" id="videoProgressFill"></div></div>
+                <div class="video-progress-text" id="videoProgressText">Processing video...</div>
+            </div>
+            <div class="upload-actions">
+                <button class="btn btn-primary" id="detectBtn" onclick="detectSingle()" disabled>
+                    <span class="spinner"></span><span class="btn-text">🔍 Detect</span>
+                </button>
+                <button class="btn btn-secondary" id="detectAllBtn" onclick="detectAll()" disabled>
+                    <span class="spinner"></span><span class="btn-text">🔍 Detect All</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- THUMBNAILS -->
+        <div class="glass-card thumbnails-section animate-in animate-delay-4" id="thumbnailsSection">
+            <div class="card-header">
+                <div class="card-title">📸 Uploaded Images</div>
+                <span class="card-title" id="thumbCount" style="font-weight:400; font-size:13px; color:var(--text-dim);"></span>
+            </div>
+            <div class="thumbnails-strip" id="thumbnailsStrip"></div>
+            <div class="batch-progress" id="batchProgress">
+                <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+                <div class="progress-text" id="progressText">Processing...</div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Toasts -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script>
+        /* ============================================================
+           STATE
+           ============================================================ */
+        const state = {
+            files: [],
+            currentIndex: 0,
+            results: new Map(),
+            zoomLevel: 1,
+            isProcessing: false,
+            currentImage: null,
+            mode: 'image',
+            videoFile: null,
+            videoResult: null,
+            activeVideoTab: 'unique'
+        };
+
+        /* ============================================================
+           DOM REFS
+           ============================================================ */
+        const $ = id => document.getElementById(id);
+        const canvas = $('detectionCanvas');
+        const ctx = canvas.getContext('2d');
+        const videoPlayer = $('videoPlayer');
+        const uploadZone = $('uploadZone');
+        const fileInput = $('fileInput');
+        const videoFileInput = $('videoFileInput');
+        const detectBtn = $('detectBtn');
+        const detectAllBtn = $('detectAllBtn');
+        const resultsBody = $('resultsBody');
+        const canvasPlaceholder = $('canvasPlaceholder');
+        const scanLine = $('scanLine');
+        const thumbnailsSection = $('thumbnailsSection');
+        const thumbnailsStrip = $('thumbnailsStrip');
+        const exportBtnEl = $('exportBtn');
+
+        /* ============================================================
+           TRACK COLORS (match backend)
+           ============================================================ */
+        const TRACK_COLORS = [
+            '#FF6B6B', '#00FF88', '#00D4FF', '#FFB800', '#FF44FF', '#44FFFF',
+            '#FF8844', '#88FF44', '#4488FF', '#FF4488', '#FFFF44', '#44FF88'
+        ];
+        function getTrackColor(trackId) {
+            return TRACK_COLORS[(trackId - 1) % TRACK_COLORS.length];
+        }
+
+        /* ============================================================
+           MODE SWITCHING
+           ============================================================ */
+        function switchMode(mode) {
+            state.mode = mode;
+            clearFiles();
+            $('modeImage').classList.toggle('active', mode === 'image');
+            $('modeVideo').classList.toggle('active', mode === 'video');
+            $('uploadFormats').classList.toggle('hidden', mode === 'video');
+            $('uploadFormatsVideo').classList.toggle('hidden', mode === 'image');
+            $('videoSettings').classList.toggle('hidden', mode === 'image');
+
+            if (mode === 'video') {
+                $('uploadIcon').textContent = '🎬';
+                $('uploadTitle').textContent = 'Drag & Drop video here';
+                detectAllBtn.style.display = 'none';
+                $('previewTitle').textContent = '🎬 Video Preview';
+            } else {
+                $('uploadIcon').textContent = '📁';
+                $('uploadTitle').textContent = 'Drag & Drop images here';
+                detectAllBtn.style.display = '';
+                $('previewTitle').textContent = '🖼️ Image Preview';
+            }
+
+            if (mode === 'video') {
+                fileInput.accept = '.mp4,.avi,.mov,.mkv,.wmv,.flv,.webm';
+                fileInput.removeAttribute('multiple');
+            } else {
+                fileInput.accept = '.jpg,.jpeg,.png,.bmp';
+                fileInput.setAttribute('multiple', '');
+            }
+        }
+
+        /* ============================================================
+           HEALTH CHECK
+           ============================================================ */
+        async function checkHealth() {
+            try {
+                const res = await fetch('/api/detection/health');
+                const data = await res.json();
+                $('healthDot').className = data.isHealthy ? 'health-dot online' : 'health-dot offline';
+                $('healthText').textContent = data.isHealthy ? 'System Online' : 'No Models';
+            } catch {
+                $('healthDot').className = 'health-dot offline';
+                $('healthText').textContent = 'Offline';
+            }
+        }
+        checkHealth();
+        setInterval(checkHealth, 30000);
+
+        /* ============================================================
+           TOAST
+           ============================================================ */
+        function showToast(type, message, duration = 3000) {
+            const icons = { success: '✅', error: '❌', warning: '⚠️', info: 'ℹ️' };
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerHTML = `<span class="toast-icon">${icons[type] || 'ℹ️'}</span><span>${message}</span>`;
+            $('toastContainer').appendChild(toast);
+            setTimeout(() => { toast.classList.add('removing'); setTimeout(() => toast.remove(), 300); }, duration);
+        }
+
+        /* ============================================================
+           FILE HANDLING
+           ============================================================ */
+        uploadZone.addEventListener('click', () => {
+            state.mode === 'video' ? videoFileInput.click() : fileInput.click();
+        });
+        fileInput.addEventListener('change', e => {
+            if (e.target.files.length > 0) {
+                state.mode === 'video' ? handleVideoFile(e.target.files[0]) : handleFiles(Array.from(e.target.files));
+            }
+        });
+        videoFileInput.addEventListener('change', e => {
+            if (e.target.files.length > 0) handleVideoFile(e.target.files[0]);
+        });
+        uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
+        uploadZone.addEventListener('dragleave', e => { e.preventDefault(); uploadZone.classList.remove('drag-over'); });
+        uploadZone.addEventListener('drop', e => {
+            e.preventDefault(); uploadZone.classList.remove('drag-over');
+            if (e.dataTransfer.files.length > 0) {
+                state.mode === 'video' ? handleVideoFile(e.dataTransfer.files[0]) : handleFiles(Array.from(e.dataTransfer.files));
+            }
+        });
+        document.addEventListener('paste', e => {
+            const items = e.clipboardData?.items;
+            if (!items) return;
+            const imgs = [];
+            for (const item of items) { if (item.type.startsWith('image/')) { const f = item.getAsFile(); if (f) imgs.push(f); } }
+            if (imgs.length > 0 && state.mode === 'image') { handleFiles(imgs); showToast('info', 'Image pasted from clipboard.'); }
+        });
+
+        const ALLOWED_IMAGES = ['.jpg', '.jpeg', '.png', '.bmp'];
+        const ALLOWED_VIDEOS = ['.mp4', '.avi', '.mov', '.mkv', '.wmv', '.flv', '.webm'];
+        const MAX_IMAGE_SIZE = 50 * 1024 * 1024;
+        const MAX_VIDEO_SIZE = 500 * 1024 * 1024;
+
+        function handleFiles(files) {
+            const valid = [];
+            for (const f of files) {
+                const ext = '.' + f.name.split('.').pop().toLowerCase();
+                if (!ALLOWED_IMAGES.includes(ext)) { showToast('warning', `"${f.name}" skipped — unsupported.`); continue; }
+                if (f.size > MAX_IMAGE_SIZE) { showToast('warning', `"${f.name}" exceeds 50MB.`); continue; }
+                valid.push(f);
+            }
+            if (!valid.length) return;
+            state.files = valid; state.currentIndex = 0; state.results.clear();
+            state.videoFile = null; state.videoResult = null;
+            hideVideoPlayer(); updateFileInfo(); buildThumbnails(); loadImageToCanvas(0); updateButtons(); clearResults();
+            showToast('success', `${valid.length} image(s) loaded.`);
+        }
+
+        function handleVideoFile(file) {
+            const ext = '.' + file.name.split('.').pop().toLowerCase();
+            if (!ALLOWED_VIDEOS.includes(ext)) { showToast('warning', `"${file.name}" — unsupported.`); return; }
+            if (file.size > MAX_VIDEO_SIZE) { showToast('warning', `"${file.name}" exceeds 500MB.`); return; }
+            state.videoFile = file; state.files = []; state.results.clear(); state.videoResult = null;
+            $('fileInfo').classList.add('visible');
+            $('fileName').textContent = file.name;
+            $('fileSize').textContent = formatBytes(file.size);
+
+            // Show original video preview
+            canvas.style.display = 'none';
+            videoPlayer.style.display = 'block';
+            videoPlayer.src = URL.createObjectURL(file);
+            canvasPlaceholder.style.display = 'none';
+            $('zoomControls').style.display = 'none';
+
+            thumbnailsSection.classList.remove('visible');
+            updateButtons(); clearResults();
+            showToast('success', `Video "${file.name}" loaded.`);
+        }
+
+        function clearFiles() {
+            state.files = []; state.currentIndex = 0; state.results.clear();
+            state.currentImage = null; state.videoFile = null; state.videoResult = null;
+            $('fileInfo').classList.remove('visible');
+            thumbnailsSection.classList.remove('visible');
+            hideVideoPlayer();
+            canvas.style.display = 'none';
+            canvasPlaceholder.innerHTML = '<span class="canvas-placeholder-icon">📷</span><span class="canvas-placeholder-text">Upload an image to begin analysis</span>';
+            canvasPlaceholder.style.display = 'flex';
+            $('zoomControls').style.display = 'flex';
+            exportBtnEl.style.display = 'none';
+            $('videoProgress').classList.remove('visible');
+            updateButtons(); clearResults();
+            fileInput.value = ''; videoFileInput.value = '';
+        }
+
+        function hideVideoPlayer() {
+            videoPlayer.style.display = 'none';
+            videoPlayer.pause();
+            videoPlayer.removeAttribute('src');
+            videoPlayer.load();
+        }
+
+        function updateFileInfo() {
+            const info = $('fileInfo');
+            if (!state.files.length && !state.videoFile) { info.classList.remove('visible'); return; }
+            info.classList.add('visible');
+            if (state.videoFile) {
+                $('fileName').textContent = state.videoFile.name;
+                $('fileSize').textContent = formatBytes(state.videoFile.size);
+            } else if (state.files.length === 1) {
+                $('fileName').textContent = state.files[0].name;
+                $('fileSize').textContent = formatBytes(state.files[0].size);
+            } else {
+                $('fileName').textContent = `${state.files.length} images selected`;
+                $('fileSize').textContent = `Total: ${formatBytes(state.files.reduce((a, f) => a + f.size, 0))}`;
+            }
+        }
+
+        function updateButtons() {
+            if (state.mode === 'video') {
+                detectBtn.disabled = !state.videoFile || state.isProcessing;
+                detectAllBtn.style.display = 'none';
+            } else {
+                detectBtn.disabled = !state.files.length || state.isProcessing;
+                detectAllBtn.style.display = '';
+                detectAllBtn.disabled = state.files.length < 2 || state.isProcessing;
+            }
+        }
+
+        function formatBytes(b) {
+            if (b < 1024) return b + ' B';
+            if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+            return (b / 1048576).toFixed(1) + ' MB';
+        }
+
+        /* ============================================================
+           THUMBNAILS
+           ============================================================ */
+        function buildThumbnails() {
+            thumbnailsStrip.innerHTML = '';
+            if (state.files.length < 2) { thumbnailsSection.classList.remove('visible'); return; }
+            thumbnailsSection.classList.add('visible');
+            $('thumbCount').textContent = `${state.files.length} images`;
+            state.files.forEach((file, i) => {
+                const item = document.createElement('div');
+                item.className = 'thumbnail-item' + (i === 0 ? ' active' : '');
+                item.onclick = () => switchImage(i);
+                const img = document.createElement('img'); img.src = URL.createObjectURL(file); item.appendChild(img);
+                const badge = document.createElement('div'); badge.className = 'thumbnail-badge'; badge.id = `badge-${i}`; item.appendChild(badge);
+                const name = document.createElement('div'); name.className = 'thumbnail-name'; name.textContent = file.name; item.appendChild(name);
+                thumbnailsStrip.appendChild(item);
+            });
+        }
+
+        function switchImage(index) {
+            state.currentIndex = index;
+            hideVideoPlayer();
+            loadImageToCanvas(index);
+            document.querySelectorAll('.thumbnail-item').forEach((el, i) => el.classList.toggle('active', i === index));
+            state.results.has(index) ? renderResults(state.results.get(index)) : clearResults();
+        }
+
+        function updateThumbnailBadge(index, count) {
+            const badge = $(`badge-${index}`);
+            if (!badge) return;
+            badge.textContent = count; badge.classList.add('visible'); badge.classList.toggle('zero', count === 0);
+        }
+
+        /* ============================================================
+           CANVAS & IMAGE
+           ============================================================ */
+        function loadImageToCanvas(index) {
+            const file = state.files[index]; if (!file) return;
+            const img = new Image();
+            img.onload = () => {
+                state.currentImage = img;
+                canvas.width = img.naturalWidth; canvas.height = img.naturalHeight;
+                ctx.drawImage(img, 0, 0);
+                canvas.style.display = 'block'; canvasPlaceholder.style.display = 'none';
+                $('zoomControls').style.display = 'flex';
+                state.zoomLevel = 1; $('canvasWrapper').style.transform = 'scale(1)';
+                if (state.results.has(index)) drawDetections(state.results.get(index).detections);
+            };
+            img.src = URL.createObjectURL(file);
+        }
+
+        function redrawCanvas() {
+            if (!state.currentImage) return;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(state.currentImage, 0, 0);
+            if (state.results.has(state.currentIndex)) drawDetections(state.results.get(state.currentIndex).detections);
+        }
+
+        /* ============================================================
+           BOUNDING BOX DRAWING
+           ============================================================ */
+        function getConfidenceColor(conf) { return conf >= 0.7 ? 'rgba(0,255,136,' : conf >= 0.4 ? 'rgba(255,184,0,' : 'rgba(255,107,107,'; }
+        function getConfidenceHex(conf) { return conf >= 0.7 ? '#00FF88' : conf >= 0.4 ? '#FFB800' : '#FF6B6B'; }
+
+        function drawDetections(detections, highlightIndex = -1) {
+            if (!state.currentImage) return;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(state.currentImage, 0, 0);
+            if (!detections || !detections.length) return;
+            detections.forEach((det, i) => {
+                const { x, y, width, height } = det.box;
+                const colorBase = getConfidenceColor(det.confidence);
+                const isHL = i === highlightIndex;
+                ctx.strokeStyle = colorBase + (isHL ? '1)' : '0.85)');
+                ctx.lineWidth = isHL ? 3 : 2;
+                if (isHL) { ctx.shadowColor = colorBase + '0.8)'; ctx.shadowBlur = 15; }
+                ctx.strokeRect(x, y, width, height);
+                ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
+                ctx.fillStyle = colorBase + (isHL ? '0.15)' : '0.05)');
+                ctx.fillRect(x, y, width, height);
+                const label = `${det.problem} (${Math.round(det.confidence * 100)}%)`;
+                ctx.font = 'bold 13px Inter, sans-serif';
+                const lW = ctx.measureText(label).width + 10, lH = 22;
+                let lX = x, lY = y - lH - 2; if (lY < 0) lY = y + 2;
+                ctx.fillStyle = 'rgba(0,0,0,0.75)';
+                roundRect(ctx, lX, lY, lW, lH, 4); ctx.fill();
+                ctx.fillStyle = getConfidenceHex(det.confidence);
+                ctx.fillText(label, lX + 5, lY + 15);
+            });
+        }
+
+        function roundRect(ctx, x, y, w, h, r) {
+            ctx.beginPath(); ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y); ctx.arcTo(x + w, y, x + w, y + r, r);
+            ctx.lineTo(x + w, y + h - r); ctx.arcTo(x + w, y + h, x + w - r, y + h, r); ctx.lineTo(x + r, y + h);
+            ctx.arcTo(x, y + h, x, y + h - r, r); ctx.lineTo(x, y + r); ctx.arcTo(x, y, x + r, y, r); ctx.closePath();
+        }
+
+        /* ============================================================
+           ZOOM
+           ============================================================ */
+        function zoomIn() { state.zoomLevel = Math.min(state.zoomLevel + 0.25, 3); $('canvasWrapper').style.transform = `scale(${state.zoomLevel})`; }
+        function zoomOut() { state.zoomLevel = Math.max(state.zoomLevel - 0.25, 0.5); $('canvasWrapper').style.transform = `scale(${state.zoomLevel})`; }
+        function zoomFit() { state.zoomLevel = 1; $('canvasWrapper').style.transform = 'scale(1)'; }
+
+        /* ============================================================
+           DETECT SINGLE (Image)
+           ============================================================ */
+        async function detectSingle() {
+            if (state.mode === 'video') { await detectVideo(); return; }
+            if (!state.files.length || state.isProcessing) return;
+            const file = state.files[state.currentIndex];
+            setProcessing(true); startScan();
+            try {
+                const fd = new FormData(); fd.append('image', file); fd.append('confidence', getConfidenceValue());
+                const res = await fetch('/api/detection/detect', { method: 'POST', body: fd });
+                if (!res.ok) { const e = await res.json().catch(() => null); throw new Error(e?.message || `Error ${res.status}`); }
+                const data = await res.json();
+                state.results.set(state.currentIndex, data);
+                updateThumbnailBadge(state.currentIndex, data.totalProblemsFound);
+                renderResults(data); drawDetections(data.detections);
+                showToast(data.totalProblemsFound > 0 ? 'success' : 'info',
+                    data.totalProblemsFound > 0 ? `Found ${data.totalProblemsFound} defect(s) in ${data.processingTimeMs}ms` : 'No defects detected.');
+            } catch (err) { showToast('error', err.message); renderError(err.message); }
+            finally { setProcessing(false); stopScan(); }
+        }
+
+        /* ============================================================
+           DETECT VIDEO
+           ============================================================ */
+        async function detectVideo() {
+            if (!state.videoFile || state.isProcessing) return;
+            setProcessing(true);
+            const progress = $('videoProgress'), fill = $('videoProgressFill'), text = $('videoProgressText');
+            progress.classList.add('visible'); fill.style.width = '0%'; text.textContent = 'Uploading video...';
+
+            try {
+                const fd = new FormData();
+                fd.append('video', state.videoFile);
+                fd.append('confidence', getConfidenceValue());
+                fd.append('frameInterval', $('frameIntervalInput').value || '30');
+                fd.append('maxFrames', $('maxFramesInput').value || '120');
+
+                text.textContent = 'Processing video (this may take a while)...';
+                fill.style.width = '30%';
+
+                const res = await fetch('/api/videodetection/detect', { method: 'POST', body: fd });
+                fill.style.width = '90%';
+                if (!res.ok) { const e = await res.json().catch(() => null); throw new Error(e?.message || `Error ${res.status}`); }
+
+                const data = await res.json();
+                state.videoResult = data;
+                fill.style.width = '100%'; text.textContent = 'Complete!';
+
+                // Show annotated video if available
+                if (data.annotatedVideoUrl) {
+                    videoPlayer.src = data.annotatedVideoUrl;
+                    videoPlayer.style.display = 'block';
+                    canvas.style.display = 'none';
+                    canvasPlaceholder.style.display = 'none';
+                    $('zoomControls').style.display = 'none';
+                    $('previewTitle').textContent = '🎬 Annotated Video';
+                    showToast('success', 'Annotated video ready!');
+                }
+
+                renderVideoResults(data);
+
+                const defects = data.totalUniqueDefects || data.totalDefectsFound || 0;
+                showToast(defects > 0 ? 'success' : 'info',
+                    defects > 0
+                        ? `Found ${defects} unique defect(s) across ${data.framesWithDefects} frames in ${(data.processingTimeMs / 1000).toFixed(1)}s`
+                        : 'No defects detected.');
+
+                setTimeout(() => progress.classList.remove('visible'), 2000);
+            } catch (err) {
+                showToast('error', err.message); renderError(err.message);
+                progress.classList.remove('visible');
+            } finally { setProcessing(false); }
+        }
+
+        /* ============================================================
+           DETECT ALL (Batch)
+           ============================================================ */
+        async function detectAll() {
+            if (state.files.length < 2 || state.isProcessing) return;
+            setProcessing(true);
+            const progress = $('batchProgress'), fill = $('progressFill'), text = $('progressText');
+            progress.classList.add('visible');
+            try {
+                for (let i = 0; i < state.files.length; i++) {
+                    fill.style.width = (i / state.files.length * 100) + '%';
+                    text.textContent = `Processing ${i + 1} of ${state.files.length}...`;
+                    switchImage(i); startScan();
+                    const fd = new FormData(); fd.append('image', state.files[i]); fd.append('confidence', getConfidenceValue());
+                    const res = await fetch('/api/detection/detect', { method: 'POST', body: fd });
+                    if (!res.ok) { const e = await res.json().catch(() => null); throw new Error(e?.message || `Error on image ${i + 1}`); }
+                    const data = await res.json();
+                    state.results.set(i, data); updateThumbnailBadge(i, data.totalProblemsFound);
+                    if (i === state.currentIndex) { renderResults(data); drawDetections(data.detections); }
+                    stopScan();
+                }
+                fill.style.width = '100%'; text.textContent = 'All images processed!';
+                const total = Array.from(state.results.values()).reduce((s, r) => s + r.totalProblemsFound, 0);
+                showToast('success', `Batch complete! ${total} total defect(s).`);
+                setTimeout(() => progress.classList.remove('visible'), 2000);
+            } catch (err) { showToast('error', err.message); stopScan(); }
+            finally { setProcessing(false); }
+        }
+
+        /* ============================================================
+           PROCESSING HELPERS
+           ============================================================ */
+        function setProcessing(p) { state.isProcessing = p; detectBtn.classList.toggle('loading', p); detectAllBtn.classList.toggle('loading', p); updateButtons(); if (p) showSkeleton(); }
+        function startScan() { scanLine.classList.add('active'); }
+        function stopScan() { scanLine.classList.remove('active'); }
+
+        /* ============================================================
+           IMAGE RESULTS RENDERING
+           ============================================================ */
+        function clearResults() {
+            resultsBody.innerHTML = '<div class="no-detections"><span class="no-detections-icon">📋</span><span class="no-detections-sub">Results will appear here after detection</span></div>';
+            exportBtnEl.style.display = 'none';
+        }
+        function showSkeleton() {
+            resultsBody.innerHTML = '<div class="summary-grid"><div class="skeleton skeleton-stat"></div><div class="skeleton skeleton-stat"></div></div><div class="skeleton skeleton-card"></div><div class="skeleton skeleton-card"></div>';
+        }
+        function renderError(msg) {
+            resultsBody.innerHTML = `<div class="no-detections"><span class="no-detections-icon">❌</span><span class="no-detections-text" style="color:var(--danger);">Detection Failed</span><span class="no-detections-sub">${msg || 'An error occurred.'}</span><button class="btn btn-secondary" onclick="detectSingle()" style="margin-top:10px;flex:none;width:auto;padding:8px 20px;">🔄 Retry</button></div>`;
+        }
+
+        function renderResults(data) {
+            if (!data.success) { renderError(data.message); return; }
+            let html = `<div class="summary-grid">
+            <div class="stat-card"><div class="stat-value ${data.totalProblemsFound > 0 ? 'danger' : 'success-color'}" id="defectCount">0</div><div class="stat-label">Defects Found</div></div>
+            <div class="stat-card"><div class="stat-value">${data.processingTimeMs}ms</div><div class="stat-label">Processing Time</div></div></div>`;
+            if (state.currentImage) {
+                html += `<div style="font-size:11px;color:var(--text-dim);margin-bottom:8px;display:flex;justify-content:space-between;">
+                <span>📐 ${state.currentImage.naturalWidth} × ${state.currentImage.naturalHeight}px</span>
+                <span>🤖 ${data.detections.length > 0 ? data.detections[0].modelSource : 'N/A'}</span></div>`;
+            }
+            if (!data.detections.length) {
+                html += '<div class="no-detections"><span class="no-detections-icon">✅</span><span class="no-detections-text">No defects detected</span><span class="no-detections-sub">Road surface appears in good condition.</span></div>';
+            } else {
+                data.detections.forEach((det, i) => {
+                    const pct = Math.round(det.confidence * 100), color = getConfidenceHex(det.confidence), delay = (i * 0.08).toFixed(2);
+                    html += `<div class="detection-card" style="animation-delay:${delay}s;" onclick="toggleCoords(this)" onmouseenter="highlightBox(${i})" onmouseleave="unhighlightBox()">
+                    <div class="detection-card-header"><div class="detection-problem"><span class="detection-index" style="background:${color}22;color:${color};">${i + 1}</span>${det.problem}</div><span class="detection-confidence-text" style="color:${color};">${pct}%</span></div>
+                    <div class="confidence-bar"><div class="confidence-fill" style="background:${color};" data-width="${pct}"></div></div>
+                    <div class="detection-meta"><span>📷 ${det.modelSource}</span><span>${pct >= 70 ? '🟢 High' : pct >= 40 ? '🟡 Medium' : '🔴 Low'}</span></div>
+                    <div class="detection-coords">x:${det.box.x.toFixed(1)}, y:${det.box.y.toFixed(1)}, w:${det.box.width.toFixed(1)}, h:${det.box.height.toFixed(1)}</div></div>`;
+                });
+            }
+            resultsBody.innerHTML = html;
+            exportBtnEl.style.display = data.detections.length > 0 ? 'flex' : 'none';
+            animateCount('defectCount', data.totalProblemsFound);
+            requestAnimationFrame(() => { document.querySelectorAll('.confidence-fill[data-width]').forEach(el => el.style.width = el.dataset.width + '%'); });
+        }
+
+        /* ============================================================
+           VIDEO RESULTS RENDERING
+           ============================================================ */
+        function renderVideoResults(data) {
+            if (!data.success) { renderError(data.message); return; }
+
+            const uniqueCount = data.totalUniqueDefects || data.totalDefectsFound || 0;
+            const rawCount = data.totalRawDetections || uniqueCount;
+
+            let html = '';
+
+            // Video metadata
+            html += `<div class="video-info-grid">
+            <div class="video-info-item"><div class="video-info-value">${data.videoDuration}</div><div class="video-info-label">Duration</div></div>
+            <div class="video-info-item"><div class="video-info-value">${data.videoFps}fps</div><div class="video-info-label">Frame Rate</div></div>
+            <div class="video-info-item"><div class="video-info-value">${data.videoWidth}×${data.videoHeight}</div><div class="video-info-label">Resolution</div></div></div>`;
+
+            // Stats
+            html += `<div class="summary-grid">
+            <div class="stat-card"><div class="stat-value ${uniqueCount > 0 ? 'danger' : 'success-color'}" id="defectCount">0</div><div class="stat-label">Unique Defects</div></div>
+            <div class="stat-card"><div class="stat-value">${rawCount}</div><div class="stat-label">Raw Detections</div></div>
+            <div class="stat-card"><div class="stat-value ${data.framesWithDefects > 0 ? 'danger' : 'success-color'}">${data.framesWithDefects}</div><div class="stat-label">Frames w/ Defects</div></div>
+            <div class="stat-card"><div class="stat-value">${(data.processingTimeMs / 1000).toFixed(1)}s</div><div class="stat-label">Total Time</div></div></div>`;
+
+            // Deduplication info
+            if (rawCount > uniqueCount) {
+                const eliminated = rawCount - uniqueCount;
+                const pct = ((eliminated / rawCount) * 100).toFixed(0);
+                html += `<div style="font-size:12px;color:var(--text-secondary);text-align:center;padding:8px;margin-bottom:8px;background:rgba(0,212,255,0.05);border-radius:var(--radius-sm);border:1px solid var(--accent-dim);">
+                🎯 Tracking eliminated <strong>${eliminated}</strong> duplicate(s) (${pct}% reduction)</div>`;
+            }
+
+            // Annotated video download
+            if (data.annotatedVideoUrl) {
+                html += `<a href="${data.annotatedVideoUrl}" download class="download-video-btn">📥 Download Annotated Video</a>`;
+            }
+
+            // Tabs
+            html += `<div class="result-tabs" style="margin-top:12px;">
+            <button class="result-tab active" onclick="switchVideoTab('unique',this)">🎯 Unique Defects (${uniqueCount})</button>
+            <button class="result-tab" onclick="switchVideoTab('timeline',this)">🕐 Timeline (${data.frameResults?.length || 0})</button>
+            <button class="result-tab" onclick="switchVideoTab('breakdown',this)">📊 Breakdown</button></div>`;
+
+            // === Unique Defects Tab ===
+            html += '<div class="tab-content active" id="tab-unique">';
+            if (data.uniqueDefects && data.uniqueDefects.length > 0) {
+                data.uniqueDefects.forEach((ud, i) => {
+                    const pct = Math.round(ud.bestConfidence * 100);
+                    const color = getTrackColor(ud.trackId);
+                    const delay = Math.min(i * 0.05, 0.8).toFixed(2);
+                    html += `<div class="unique-defect-card" style="animation-delay:${delay}s;border-left:3px solid ${color};"
+                        onclick="seekToTimestamp(${ud.bestTimestamp})">
+                    <div class="unique-defect-header">
+                        <div class="unique-defect-name">
+                            <span class="track-badge" style="background:${color}22;color:${color};">#${ud.trackId}</span>
+                            ${ud.defectClass}
+                        </div>
+                        <span style="font-size:13px;font-weight:600;color:${getConfidenceHex(ud.bestConfidence)};">${pct}%</span>
+                    </div>
+                    <div class="unique-defect-meta">
+                        <span>📍 First: ${formatTs(ud.firstSeenTimestamp)}</span>
+                        <span>📍 Last: ${formatTs(ud.lastSeenTimestamp)}</span>
+                        <span>👁️ ${ud.totalFrameAppearances} frame(s)</span>
+                    </div></div>`;
+                });
+            } else {
+                html += '<div class="no-detections"><span class="no-detections-icon">✅</span><span class="no-detections-text">No defects detected</span></div>';
+            }
+            html += '</div>';
+
+            // === Timeline Tab ===
+            html += '<div class="tab-content" id="tab-timeline"><div class="frame-timeline">';
+            if (data.frameResults) {
+                data.frameResults.forEach((frame, i) => {
+                    const has = frame.defectsInFrame > 0;
+                    const delay = Math.min(i * 0.03, 1).toFixed(2);
+                    const defList = has
+                        ? frame.detections.map(d => d.problem).filter((v, idx, a) => a.indexOf(v) === idx).join(', ')
+                        : 'No defects';
+
+                    // Show track IDs if available
+                    let trackInfo = '';
+                    if (frame.trackIds && frame.trackIds.length > 0) {
+                        trackInfo = frame.trackIds.map(tid =>
+                            `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${getTrackColor(tid)};margin-right:2px;" title="Track #${tid}"></span>`
+                        ).join('');
+                    }
+
+                    html += `<div class="frame-card ${has ? 'has-defects' : 'clean'}" style="animation-delay:${delay}s;"
+                        onclick="seekToTimestamp(${frame.timestampSeconds})">
+                    <span class="frame-timestamp">${frame.timestamp}</span>
+                    <div class="frame-info">
+                        <div class="frame-defect-count">Frame #${frame.frameNumber} ${trackInfo}</div>
+                        <div class="frame-defect-list">${defList}</div>
+                    </div>
+                    <span class="frame-badge ${has ? 'danger' : 'success'}">${has ? frame.defectsInFrame : '✓'}</span></div>`;
+                });
+            }
+            html += '</div></div>';
+
+            // === Breakdown Tab ===
+            html += '<div class="tab-content" id="tab-breakdown">';
+
+            // Unique breakdown
+            const defSummary = data.defectSummary || {};
+            if (Object.keys(defSummary).length > 0) {
+                html += '<div style="font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:6px;">Unique Defects by Type</div>';
+                html += '<div class="defect-summary">';
+                for (const [name, count] of Object.entries(defSummary)) {
+                    html += `<div class="defect-summary-item"><span class="defect-summary-count">${count}</span><span class="defect-summary-name">${name}</span></div>`;
+                }
+                html += '</div>';
+            }
+
+            // Raw breakdown
+            const rawSummary = data.rawDefectSummary || {};
+            if (Object.keys(rawSummary).length > 0) {
+                html += '<div style="font-size:12px;font-weight:600;color:var(--text-secondary);margin:8px 0 6px;">Raw Detections by Type (before tracking)</div>';
+                html += '<div class="defect-summary">';
+                for (const [name, count] of Object.entries(rawSummary)) {
+                    html += `<div class="defect-summary-item"><span class="defect-summary-count" style="color:var(--text-secondary);">${count}</span><span class="defect-summary-name">${name}</span></div>`;
+                }
+                html += '</div>';
+            }
+
+            html += `<div style="font-size:11px;color:var(--text-dim);margin-top:12px;text-align:center;">
+            Avg ${data.avgTimePerFrameMs}ms/frame · Every ${data.frameIntervalUsed}th frame analyzed</div>`;
+            html += '</div>';
+
+            resultsBody.innerHTML = html;
+            exportBtnEl.style.display = uniqueCount > 0 ? 'flex' : 'none';
+            animateCount('defectCount', uniqueCount);
+        }
+
+        /* ============================================================
+           VIDEO HELPERS
+           ============================================================ */
+        function switchVideoTab(tabName, btn) {
+            document.querySelectorAll('.result-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            btn.classList.add('active');
+            const tab = $(`tab-${tabName}`);
+            if (tab) tab.classList.add('active');
+            state.activeVideoTab = tabName;
+        }
+
+        function seekToTimestamp(seconds) {
+            if (videoPlayer && videoPlayer.style.display !== 'none') {
+                videoPlayer.currentTime = seconds;
+                videoPlayer.play();
+                showToast('info', `Seeking to ${formatTs(seconds)}`);
+            }
+        }
+
+        function formatTs(seconds) {
+            const ts = new Date(seconds * 1000);
+            const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+            const s = (seconds % 60).toFixed(1).padStart(4, '0');
+            return `${m}:${s}`;
+        }
+
+        /* ============================================================
+           INTERACTIONS
+           ============================================================ */
+        function toggleCoords(card) { card.classList.toggle('expanded'); }
+        function highlightBox(index) {
+            const data = state.results.get(state.currentIndex);
+            if (data) drawDetections(data.detections, index);
+            document.querySelectorAll('.detection-card').forEach((c, i) => c.classList.toggle('highlighted', i === index));
+        }
+        function unhighlightBox() {
+            const data = state.results.get(state.currentIndex);
+            if (data) drawDetections(data.detections, -1);
+            document.querySelectorAll('.detection-card').forEach(c => c.classList.remove('highlighted'));
+        }
+
+        /* ============================================================
+           COUNT-UP ANIMATION
+           ============================================================ */
+        function animateCount(id, target) {
+            const el = $(id); if (!el) return;
+            if (target === 0) { el.textContent = '0'; return; }
+            let c = 0; const step = Math.max(1, Math.floor(target / 20));
+            const iv = setInterval(() => { c += step; if (c >= target) { c = target; clearInterval(iv); } el.textContent = c; }, 40);
+        }
+
+        /* ============================================================
+           EXPORT
+           ============================================================ */
+        function exportReport() {
+            let report;
+            if (state.mode === 'video' && state.videoResult) {
+                report = { exportedAt: new Date().toISOString(), type: 'video', videoResult: state.videoResult };
+            } else {
+                const all = {};
+                state.results.forEach((v, k) => { all[state.files[k]?.name || `image_${k}`] = v; });
+                report = {
+                    exportedAt: new Date().toISOString(), type: 'image', totalImages: state.results.size,
+                    totalDefects: Array.from(state.results.values()).reduce((s, r) => s + r.totalProblemsFound, 0), results: all
+                };
+            }
+            const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+            const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+            a.download = `defect-report-${Date.now()}.json`; a.click();
+            showToast('success', 'Report downloaded!');
+        }
+
+        /* ============================================================
+           CONFIDENCE SLIDER
+           ============================================================ */
+        function updateConfidenceDisplay() {
+            const v = parseInt($('confidenceSlider').value), d = $('confidenceDisplay');
+            d.textContent = v + '%';
+            if (v < 30) { d.style.color = 'var(--danger)'; d.style.borderColor = 'rgba(255,107,107,0.3)'; d.style.background = 'rgba(255,107,107,0.1)'; }
+            else if (v < 60) { d.style.color = 'var(--warning)'; d.style.borderColor = 'rgba(255,184,0,0.3)'; d.style.background = 'rgba(255,184,0,0.1)'; }
+            else { d.style.color = 'var(--success)'; d.style.borderColor = 'rgba(0,255,136,0.3)'; d.style.background = 'rgba(0,255,136,0.1)'; }
+        }
+        function getConfidenceValue() { return parseInt($('confidenceSlider').value); }
+
+        /* ============================================================
+           INIT
+           ============================================================ */
+        document.addEventListener('DOMContentLoaded', () => {
+            document.querySelectorAll('.animate-in').forEach(el => el.style.animationFillMode = 'forwards');
+        });
+    </script>
+</body>
+</html>
