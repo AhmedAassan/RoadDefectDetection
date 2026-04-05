@@ -13,6 +13,9 @@ namespace RoadDefectDetection.Services
     /// 2. Cross-class NMS (removes overlapping boxes of DIFFERENT classes)
     /// 3. Minimum box size filtering
     /// 4. Area-based duplicate removal
+    /// 
+    /// Now also carries ModelId and ClassIndex on each detection
+    /// for external system mapping.
     /// </summary>
     public sealed class YoloDetector : IDisposable
     {
@@ -21,29 +24,29 @@ namespace RoadDefectDetection.Services
         private readonly float _confidenceThreshold;
         private readonly float _iouThreshold;
         private readonly string _modelName;
+        private readonly int _modelId;
         private readonly int _inputSize;
         private bool _disposed;
 
         /// <summary>
         /// Cross-class IoU threshold. If two detections of DIFFERENT classes
         /// overlap more than this, keep only the higher-confidence one.
-        /// This prevents "Pothole" and "Alligator Crack" boxes on the same spot.
         /// </summary>
         private const float CrossClassIouThreshold = 0.60f;
 
         /// <summary>
         /// Minimum box dimension in pixels (original image space).
-        /// Boxes smaller than this are likely noise.
         /// </summary>
         private const float MinBoxDimension = 8f;
 
         /// <summary>
         /// If one box contains more than this fraction of another box's area,
-        /// they're considered duplicates (containment check).
+        /// they're considered duplicates.
         /// </summary>
         private const float ContainmentThreshold = 0.85f;
 
         public string ModelName => _modelName;
+        public int ModelId => _modelId;
         public string[] ClassNames => _classNames;
 
         public YoloDetector(
@@ -52,6 +55,7 @@ namespace RoadDefectDetection.Services
             float confidenceThreshold,
             float iouThreshold,
             string modelName,
+            int modelId,
             int inputSize = 640)
         {
             if (!File.Exists(onnxPath))
@@ -62,6 +66,7 @@ namespace RoadDefectDetection.Services
             _confidenceThreshold = confidenceThreshold;
             _iouThreshold = iouThreshold;
             _modelName = modelName ?? throw new ArgumentNullException(nameof(modelName));
+            _modelId = modelId;
             _inputSize = inputSize;
 
             var opts = new Microsoft.ML.OnnxRuntime.SessionOptions
@@ -164,6 +169,8 @@ namespace RoadDefectDetection.Services
                     Problem = _classNames[bestClass],
                     Confidence = bestConf,
                     ModelSource = _modelName,
+                    ModelId = _modelId,
+                    ClassIndex = bestClass,
                     Box = new BoundingBox
                     {
                         X = x1,
@@ -210,10 +217,7 @@ namespace RoadDefectDetection.Services
 
         /// <summary>
         /// Cross-class NMS: if two detections of DIFFERENT classes overlap
-        /// heavily (IoU > 0.60), keep only the higher-confidence one.
-        /// 
-        /// This handles cases like the same area being detected as both
-        /// "Pothole" and "Alligator Crack".
+        /// heavily, keep only the higher-confidence one.
         /// </summary>
         private List<DetectionResult> ApplyCrossClassNms(
             List<DetectionResult> detections)
@@ -236,7 +240,6 @@ namespace RoadDefectDetection.Services
                 {
                     if (suppressed.Contains(j)) continue;
 
-                    // Different class but high overlap → suppress lower confidence
                     float iou = ComputeIoU(sorted[i].Box, sorted[j].Box);
                     if (iou > CrossClassIouThreshold)
                     {
@@ -249,11 +252,8 @@ namespace RoadDefectDetection.Services
         }
 
         /// <summary>
-        /// Containment check: if box A is almost entirely inside box B
-        /// (or vice versa), keep only the higher-confidence one.
-        /// 
-        /// This catches cases where a small box is inside a large box
-        /// but their IoU is low (because the large box is much bigger).
+        /// Containment check: if one box is almost entirely inside another,
+        /// keep only the higher-confidence one.
         /// </summary>
         private List<DetectionResult> RemoveContainedBoxes(
             List<DetectionResult> detections)
@@ -288,10 +288,6 @@ namespace RoadDefectDetection.Services
             return keep;
         }
 
-        /// <summary>
-        /// Computes what fraction of the smaller box's area is contained
-        /// within the larger box. Returns value between 0 and 1.
-        /// </summary>
         private static float ComputeContainment(BoundingBox a, BoundingBox b)
         {
             float x1 = Math.Max(a.X, b.X);

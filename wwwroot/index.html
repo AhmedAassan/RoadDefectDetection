@@ -21,6 +21,7 @@
             --danger: #FF6B6B;
             --success: #00FF88;
             --warning: #FFB800;
+            --purple: #A855F7;
             --text-primary: #F1F5F9;
             --text-secondary: #94A3B8;
             --text-dim: #64748B;
@@ -213,6 +214,11 @@
             opacity: 0;
         }
 
+        .animate-delay-5 {
+            animation-delay: 0.5s;
+            opacity: 0;
+        }
+
         /* ── Layout ──────────────────────────────────────────── */
         .app-container {
             position: relative;
@@ -268,6 +274,12 @@
             margin-top: 2px;
         }
 
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
         .health-indicator {
             display: flex;
             align-items: center;
@@ -300,9 +312,41 @@
                 box-shadow: 0 0 8px var(--danger);
             }
 
+        .models-badge {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            background: var(--bg-glass);
+            border: 1px solid var(--border-glass);
+            border-radius: 16px;
+            font-size: 12px;
+            color: var(--text-dim);
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+            .models-badge:hover {
+                border-color: var(--accent-dim);
+                color: var(--text-secondary);
+            }
+
+        .models-badge-count {
+            min-width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--accent-dim);
+            color: var(--accent);
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
         .main-grid {
             display: grid;
-            grid-template-columns: 1fr 380px;
+            grid-template-columns: 1fr 400px;
             gap: 20px;
             margin-bottom: 20px;
         }
@@ -604,6 +648,69 @@
             display: block;
         }
 
+        /* ── External Mapping Badge ──────────────────────────── */
+        .mapping-info {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin-top: 6px;
+            padding-top: 6px;
+            border-top: 1px solid var(--border-glass);
+        }
+
+        .mapping-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 10px;
+            font-weight: 600;
+        }
+
+            .mapping-badge.external {
+                background: rgba(168,85,247,0.12);
+                color: var(--purple);
+                border: 1px solid rgba(168,85,247,0.25);
+            }
+
+            .mapping-badge.severity-high {
+                background: rgba(255,107,107,0.12);
+                color: var(--danger);
+                border: 1px solid rgba(255,107,107,0.25);
+            }
+
+            .mapping-badge.severity-medium {
+                background: rgba(255,184,0,0.12);
+                color: var(--warning);
+                border: 1px solid rgba(255,184,0,0.25);
+            }
+
+            .mapping-badge.severity-low {
+                background: rgba(0,255,136,0.12);
+                color: var(--success);
+                border: 1px solid rgba(0,255,136,0.25);
+            }
+
+            .mapping-badge.category {
+                background: rgba(0,212,255,0.08);
+                color: var(--accent);
+                border: 1px solid var(--accent-dim);
+            }
+
+            .mapping-badge.unmapped {
+                background: rgba(100,116,139,0.15);
+                color: var(--text-dim);
+                border: 1px solid rgba(100,116,139,0.3);
+            }
+
+            .mapping-badge.model-id {
+                background: rgba(255,255,255,0.04);
+                color: var(--text-dim);
+                border: 1px solid var(--border-glass);
+            }
+
+        /* ── No Detections ───────────────────────────────────── */
         .no-detections {
             display: flex;
             flex-direction: column;
@@ -911,12 +1018,11 @@
             color: #fff;
             font-size: 10px;
             font-weight: 700;
-            display: flex;
+            display: none;
             align-items: center;
             justify-content: center;
             border-radius: 10px;
             padding: 0 5px;
-            display: none;
             z-index: 2;
         }
 
@@ -1124,6 +1230,77 @@
             .mode-btn.active {
                 background: var(--accent-dim);
                 color: var(--accent);
+            }
+
+        /* ── Output Mode Toggle ──────────────────────────────── */
+        .output-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 20px;
+            border-top: 1px solid var(--border-glass);
+            background: var(--bg-glass);
+        }
+
+            .output-toggle label {
+                font-size: 12px;
+                font-weight: 600;
+                color: var(--text-secondary);
+                white-space: nowrap;
+            }
+
+        .toggle-switch {
+            position: relative;
+            width: 44px;
+            height: 24px;
+            cursor: pointer;
+            display: inline-block;
+        }
+
+            .toggle-switch input {
+                opacity: 0;
+                width: 0;
+                height: 0;
+            }
+
+        .toggle-slider {
+            position: absolute;
+            inset: 0;
+            background: rgba(255,255,255,0.08);
+            border-radius: 12px;
+            transition: var(--transition);
+        }
+
+            .toggle-slider::before {
+                content: '';
+                position: absolute;
+                top: 3px;
+                left: 3px;
+                width: 18px;
+                height: 18px;
+                background: var(--text-dim);
+                border-radius: 50%;
+                transition: var(--transition);
+            }
+
+        .toggle-switch input:checked + .toggle-slider {
+            background: var(--purple);
+        }
+
+            .toggle-switch input:checked + .toggle-slider::before {
+                transform: translateX(20px);
+                background: white;
+            }
+
+        .output-mode-label {
+            font-size: 12px;
+            color: var(--text-dim);
+            transition: var(--transition);
+        }
+
+            .output-mode-label.active {
+                color: var(--purple);
+                font-weight: 600;
             }
 
         /* ── Video Results ───────────────────────────────────── */
@@ -1388,7 +1565,6 @@
             text-align: center;
         }
 
-        /* ── Video Download Button ───────────────────────────── */
         .download-video-btn {
             display: flex;
             align-items: center;
@@ -1406,6 +1582,7 @@
             font-weight: 600;
             cursor: pointer;
             transition: var(--transition);
+            text-decoration: none;
         }
 
             .download-video-btn:hover {
@@ -1413,7 +1590,7 @@
                 box-shadow: 0 4px 20px var(--accent-glow);
             }
 
-        /* ── Tabs for video results ──────────────────────────── */
+        /* ── Tabs ────────────────────────────────────────────── */
         .result-tabs {
             display: flex;
             gap: 4px;
@@ -1455,6 +1632,151 @@
                 display: block;
             }
 
+        /* ── Models Modal ────────────────────────────────────── */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(4px);
+            z-index: 500;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+
+            .modal-overlay.visible {
+                display: flex;
+            }
+
+        .modal-content {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-glass);
+            border-radius: var(--radius);
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: var(--shadow-lg);
+            animation: fadeInUp 0.3s ease;
+        }
+
+        .modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 20px;
+            border-bottom: 1px solid var(--border-glass);
+        }
+
+            .modal-header h2 {
+                font-size: 18px;
+                font-weight: 700;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--text-dim);
+            font-size: 22px;
+            cursor: pointer;
+            padding: 4px;
+            transition: var(--transition);
+        }
+
+            .modal-close:hover {
+                color: var(--danger);
+            }
+
+        .modal-body {
+            padding: 20px;
+        }
+
+        .model-item {
+            background: var(--bg-glass);
+            border: 1px solid var(--border-glass);
+            border-radius: var(--radius-sm);
+            padding: 16px;
+            margin-bottom: 12px;
+        }
+
+            .model-item:last-child {
+                margin-bottom: 0;
+            }
+
+        .model-item-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .model-item-name {
+            font-size: 15px;
+            font-weight: 600;
+        }
+
+        .model-item-id {
+            padding: 2px 8px;
+            border-radius: 10px;
+            background: var(--accent-dim);
+            color: var(--accent);
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .model-item-classes {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 8px;
+        }
+
+        .model-class-chip {
+            padding: 3px 10px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid var(--border-glass);
+            border-radius: 12px;
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+
+        .mapping-section {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid var(--border-glass);
+        }
+
+        .mapping-section-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--purple);
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .mapping-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 0;
+            font-size: 12px;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+        }
+
+            .mapping-row:last-child {
+                border-bottom: none;
+            }
+
+        .mapping-arrow {
+            color: var(--text-dim);
+            font-size: 14px;
+        }
+
         .hidden {
             display: none !important;
         }
@@ -1489,6 +1811,10 @@
                 font-size: 17px;
             }
 
+            .header-right {
+                flex-wrap: wrap;
+            }
+
             .upload-zone {
                 padding: 24px 16px;
             }
@@ -1521,12 +1847,18 @@
                 <div class="header-icon">🔍</div>
                 <div>
                     <div class="header-title">Road Defect Detection System</div>
-                    <div class="header-subtitle">AI-Powered Road Surface Analysis</div>
+                    <div class="header-subtitle">AI-Powered Multi-Model Road Surface Analysis</div>
                 </div>
             </div>
-            <div class="health-indicator" id="healthIndicator">
-                <span class="health-dot" id="healthDot"></span>
-                <span id="healthText">Checking...</span>
+            <div class="header-right">
+                <div class="models-badge" id="modelsBadge" onclick="showModelsModal()" title="View loaded models & mappings">
+                    🤖 Models
+                    <span class="models-badge-count" id="modelsCount">0</span>
+                </div>
+                <div class="health-indicator" id="healthIndicator">
+                    <span class="health-dot" id="healthDot"></span>
+                    <span id="healthText">Checking...</span>
+                </div>
             </div>
         </header>
 
@@ -1616,6 +1948,16 @@
                 <input type="range" id="confidenceSlider" class="confidence-slider" min="0" max="100" value="15" oninput="updateConfidenceDisplay()">
                 <span class="confidence-display" id="confidenceDisplay">15%</span>
             </div>
+            <!-- External Mapping Toggle -->
+            <div class="output-toggle" id="outputToggle">
+                <label>📡 Output:</label>
+                <span class="output-mode-label active" id="labelStandard">Standard</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="mappedToggle" onchange="updateOutputMode()">
+                    <span class="toggle-slider"></span>
+                </label>
+                <span class="output-mode-label" id="labelMapped">External Mapped</span>
+            </div>
             <div class="video-settings hidden" id="videoSettings">
                 <div class="video-setting">
                     <label>🎞️ Frame Interval:</label>
@@ -1655,6 +1997,19 @@
 
     </div>
 
+    <!-- Models Modal -->
+    <div class="modal-overlay" id="modelsModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>🤖 Loaded Models & Mappings</h2>
+                <button class="modal-close" onclick="closeModelsModal()">✕</button>
+            </div>
+            <div class="modal-body" id="modelsModalBody">
+                <div style="text-align:center;color:var(--text-dim);padding:20px;">Loading...</div>
+            </div>
+        </div>
+    </div>
+
     <!-- Toasts -->
     <div class="toast-container" id="toastContainer"></div>
 
@@ -1665,14 +2020,18 @@
         const state = {
             files: [],
             currentIndex: 0,
-            results: new Map(),
+            results: new Map(),       // standard results
+            mappedResults: new Map(),  // mapped results
             zoomLevel: 1,
             isProcessing: false,
             currentImage: null,
-            mode: 'image',
+            mode: 'image',            // 'image' or 'video'
+            useMapped: false,         // toggle for external mapping
             videoFile: null,
             videoResult: null,
-            activeVideoTab: 'unique'
+            activeVideoTab: 'unique',
+            modelsInfo: null,
+            mappingsInfo: null
         };
 
         /* ============================================================
@@ -1703,6 +2062,38 @@
         ];
         function getTrackColor(trackId) {
             return TRACK_COLORS[(trackId - 1) % TRACK_COLORS.length];
+        }
+
+        /* ============================================================
+           OUTPUT MODE TOGGLE
+           ============================================================ */
+        function updateOutputMode() {
+            state.useMapped = $('mappedToggle').checked;
+            $('labelStandard').classList.toggle('active', !state.useMapped);
+            $('labelMapped').classList.toggle('active', state.useMapped);
+
+            // Re-render current results if available
+            if (state.mode === 'image' && state.files.length > 0) {
+                const resultMap = state.useMapped ? state.mappedResults : state.results;
+                if (resultMap.has(state.currentIndex)) {
+                    const data = resultMap.get(state.currentIndex);
+                    state.useMapped ? renderMappedResults(data) : renderResults(data);
+                    const dets = state.useMapped ? extractDetectionsFromMapped(data) : data.detections;
+                    drawDetections(dets);
+                }
+            }
+        }
+
+        function extractDetectionsFromMapped(mappedResponse) {
+            if (!mappedResponse || !mappedResponse.detections) return [];
+            return mappedResponse.detections.map(d => ({
+                problem: d.externalClassName || d.internalClassName,
+                confidence: d.confidence,
+                modelSource: d.modelSource,
+                box: d.box,
+                classIndex: d.internalClassIndex,
+                modelId: d.modelId
+            }));
         }
 
         /* ============================================================
@@ -1747,13 +2138,105 @@
                 const data = await res.json();
                 $('healthDot').className = data.isHealthy ? 'health-dot online' : 'health-dot offline';
                 $('healthText').textContent = data.isHealthy ? 'System Online' : 'No Models';
+                $('modelsCount').textContent = data.loadedModels || 0;
             } catch {
                 $('healthDot').className = 'health-dot offline';
                 $('healthText').textContent = 'Offline';
+                $('modelsCount').textContent = '0';
             }
         }
         checkHealth();
         setInterval(checkHealth, 30000);
+
+        /* ============================================================
+           MODELS MODAL
+           ============================================================ */
+        async function showModelsModal() {
+            $('modelsModal').classList.add('visible');
+            $('modelsModalBody').innerHTML = '<div style="text-align:center;color:var(--text-dim);padding:20px;">Loading...</div>';
+
+            try {
+                const [modelsRes, mappingsRes] = await Promise.all([
+                    fetch('/api/detection/models'),
+                    fetch('/api/detection/mappings')
+                ]);
+                const modelsData = await modelsRes.json();
+                const mappingsData = await mappingsRes.json();
+
+                state.modelsInfo = modelsData;
+                state.mappingsInfo = mappingsData;
+
+                renderModelsModal(modelsData, mappingsData);
+            } catch (err) {
+                $('modelsModalBody').innerHTML = `<div style="text-align:center;color:var(--danger);padding:20px;">Failed to load: ${err.message}</div>`;
+            }
+        }
+
+        function closeModelsModal() {
+            $('modelsModal').classList.remove('visible');
+        }
+
+        function renderModelsModal(modelsData, mappingsData) {
+            const models = modelsData.models || [];
+            const mappings = mappingsData.mappings || [];
+
+            if (models.length === 0) {
+                $('modelsModalBody').innerHTML = '<div style="text-align:center;color:var(--text-dim);padding:20px;">No models loaded.</div>';
+                return;
+            }
+
+            let html = '';
+            models.forEach(model => {
+                const modelMappings = mappings.filter(m => m.modelId === model.modelId);
+
+                html += `<div class="model-item">
+                        <div class="model-item-header">
+                            <span class="model-item-name">${model.name}</span>
+                            <span class="model-item-id">ID: ${model.modelId}</span>
+                        </div>
+                        <div style="font-size:12px;color:var(--text-dim);margin-bottom:6px;">
+                            ${model.classCount} class(es) · Status: <span style="color:var(--success);">${model.status}</span>
+                        </div>
+                        <div class="model-item-classes">
+                            ${model.classes.map((c, idx) => `<span class="model-class-chip" title="Index: ${idx}">${idx}: ${c}</span>`).join('')}
+                        </div>`;
+
+                if (modelMappings.length > 0) {
+                    html += `<div class="mapping-section">
+                            <div class="mapping-section-title">📡 External System Mappings</div>`;
+                    modelMappings.forEach(m => {
+                        const internalName = model.classes[m.internalModelClassIndex] || `Index ${m.internalModelClassIndex}`;
+                        html += `<div class="mapping-row">
+                                <span style="color:var(--text-secondary);">${internalName}</span>
+                                <span class="mapping-arrow">→</span>
+                                <span class="mapping-badge external">ID:${m.externalClassId}</span>
+                                <span style="color:var(--purple);font-weight:600;">${m.externalClassName}</span>
+                                ${m.severity ? `<span class="mapping-badge severity-${m.severity.toLowerCase()}">${m.severity}</span>` : ''}
+                                ${m.category ? `<span class="mapping-badge category">${m.category}</span>` : ''}
+                            </div>`;
+                    });
+                    html += '</div>';
+                } else {
+                    html += `<div style="font-size:11px;color:var(--text-dim);margin-top:8px;font-style:italic;">
+                            No external mappings configured for this model.</div>`;
+                }
+
+                html += '</div>';
+            });
+
+            // Summary
+            html += `<div style="text-align:center;font-size:12px;color:var(--text-dim);margin-top:12px;padding:10px;
+                    background:var(--bg-glass);border-radius:var(--radius-sm);border:1px solid var(--border-glass);">
+                    ${models.length} model(s) loaded · ${mappings.length} external mapping(s) configured
+                </div>`;
+
+            $('modelsModalBody').innerHTML = html;
+        }
+
+        // Close modal on overlay click
+        $('modelsModal').addEventListener('click', e => {
+            if (e.target === $('modelsModal')) closeModelsModal();
+        });
 
         /* ============================================================
            TOAST
@@ -1811,9 +2294,11 @@
                 valid.push(f);
             }
             if (!valid.length) return;
-            state.files = valid; state.currentIndex = 0; state.results.clear();
+            state.files = valid; state.currentIndex = 0;
+            state.results.clear(); state.mappedResults.clear();
             state.videoFile = null; state.videoResult = null;
-            hideVideoPlayer(); updateFileInfo(); buildThumbnails(); loadImageToCanvas(0); updateButtons(); clearResults();
+            hideVideoPlayer(); updateFileInfo(); buildThumbnails();
+            loadImageToCanvas(0); updateButtons(); clearResults();
             showToast('success', `${valid.length} image(s) loaded.`);
         }
 
@@ -1821,25 +2306,25 @@
             const ext = '.' + file.name.split('.').pop().toLowerCase();
             if (!ALLOWED_VIDEOS.includes(ext)) { showToast('warning', `"${file.name}" — unsupported.`); return; }
             if (file.size > MAX_VIDEO_SIZE) { showToast('warning', `"${file.name}" exceeds 500MB.`); return; }
-            state.videoFile = file; state.files = []; state.results.clear(); state.videoResult = null;
+            state.videoFile = file; state.files = [];
+            state.results.clear(); state.mappedResults.clear();
+            state.videoResult = null;
             $('fileInfo').classList.add('visible');
             $('fileName').textContent = file.name;
             $('fileSize').textContent = formatBytes(file.size);
-
-            // Show original video preview
             canvas.style.display = 'none';
             videoPlayer.style.display = 'block';
             videoPlayer.src = URL.createObjectURL(file);
             canvasPlaceholder.style.display = 'none';
             $('zoomControls').style.display = 'none';
-
             thumbnailsSection.classList.remove('visible');
             updateButtons(); clearResults();
             showToast('success', `Video "${file.name}" loaded.`);
         }
 
         function clearFiles() {
-            state.files = []; state.currentIndex = 0; state.results.clear();
+            state.files = []; state.currentIndex = 0;
+            state.results.clear(); state.mappedResults.clear();
             state.currentImage = null; state.videoFile = null; state.videoResult = null;
             $('fileInfo').classList.remove('visible');
             thumbnailsSection.classList.remove('visible');
@@ -1918,13 +2403,22 @@
             hideVideoPlayer();
             loadImageToCanvas(index);
             document.querySelectorAll('.thumbnail-item').forEach((el, i) => el.classList.toggle('active', i === index));
-            state.results.has(index) ? renderResults(state.results.get(index)) : clearResults();
+            const resultMap = state.useMapped ? state.mappedResults : state.results;
+            if (resultMap.has(index)) {
+                const data = resultMap.get(index);
+                state.useMapped ? renderMappedResults(data) : renderResults(data);
+                const dets = state.useMapped ? extractDetectionsFromMapped(data) : data.detections;
+                drawDetections(dets);
+            } else {
+                clearResults();
+            }
         }
 
         function updateThumbnailBadge(index, count) {
             const badge = $(`badge-${index}`);
             if (!badge) return;
-            badge.textContent = count; badge.classList.add('visible'); badge.classList.toggle('zero', count === 0);
+            badge.textContent = count; badge.classList.add('visible');
+            badge.classList.toggle('zero', count === 0);
         }
 
         /* ============================================================
@@ -1940,7 +2434,12 @@
                 canvas.style.display = 'block'; canvasPlaceholder.style.display = 'none';
                 $('zoomControls').style.display = 'flex';
                 state.zoomLevel = 1; $('canvasWrapper').style.transform = 'scale(1)';
-                if (state.results.has(index)) drawDetections(state.results.get(index).detections);
+                const resultMap = state.useMapped ? state.mappedResults : state.results;
+                if (resultMap.has(index)) {
+                    const data = resultMap.get(index);
+                    const dets = state.useMapped ? extractDetectionsFromMapped(data) : data.detections;
+                    drawDetections(dets);
+                }
             };
             img.src = URL.createObjectURL(file);
         }
@@ -1949,14 +2448,23 @@
             if (!state.currentImage) return;
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.drawImage(state.currentImage, 0, 0);
-            if (state.results.has(state.currentIndex)) drawDetections(state.results.get(state.currentIndex).detections);
+            const resultMap = state.useMapped ? state.mappedResults : state.results;
+            if (resultMap.has(state.currentIndex)) {
+                const data = resultMap.get(state.currentIndex);
+                const dets = state.useMapped ? extractDetectionsFromMapped(data) : data.detections;
+                drawDetections(dets);
+            }
         }
 
         /* ============================================================
            BOUNDING BOX DRAWING
            ============================================================ */
-        function getConfidenceColor(conf) { return conf >= 0.7 ? 'rgba(0,255,136,' : conf >= 0.4 ? 'rgba(255,184,0,' : 'rgba(255,107,107,'; }
-        function getConfidenceHex(conf) { return conf >= 0.7 ? '#00FF88' : conf >= 0.4 ? '#FFB800' : '#FF6B6B'; }
+        function getConfidenceColor(conf) {
+            return conf >= 0.7 ? 'rgba(0,255,136,' : conf >= 0.4 ? 'rgba(255,184,0,' : 'rgba(255,107,107,';
+        }
+        function getConfidenceHex(conf) {
+            return conf >= 0.7 ? '#00FF88' : conf >= 0.4 ? '#FFB800' : '#FF6B6B';
+        }
 
         function drawDetections(detections, highlightIndex = -1) {
             if (!state.currentImage) return;
@@ -1974,7 +2482,8 @@
                 ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
                 ctx.fillStyle = colorBase + (isHL ? '0.15)' : '0.05)');
                 ctx.fillRect(x, y, width, height);
-                const label = `${det.problem} (${Math.round(det.confidence * 100)}%)`;
+                const name = det.problem || det.internalClassName || 'Detection';
+                const label = `${name} (${Math.round(det.confidence * 100)}%)`;
                 ctx.font = 'bold 13px Inter, sans-serif';
                 const lW = ctx.measureText(label).width + 10, lH = 22;
                 let lX = x, lY = y - lH - 2; if (lY < 0) lY = y + 2;
@@ -1999,6 +2508,16 @@
         function zoomFit() { state.zoomLevel = 1; $('canvasWrapper').style.transform = 'scale(1)'; }
 
         /* ============================================================
+           API ENDPOINT SELECTION
+           ============================================================ */
+        function getDetectEndpoint() {
+            return state.useMapped ? '/api/detection/detect-mapped' : '/api/detection/detect';
+        }
+        function getDetectMultipleEndpoint() {
+            return state.useMapped ? '/api/detection/detect-mapped-multiple' : '/api/detection/detect-multiple';
+        }
+
+        /* ============================================================
            DETECT SINGLE (Image)
            ============================================================ */
         async function detectSingle() {
@@ -2007,17 +2526,49 @@
             const file = state.files[state.currentIndex];
             setProcessing(true); startScan();
             try {
-                const fd = new FormData(); fd.append('image', file); fd.append('confidence', getConfidenceValue());
-                const res = await fetch('/api/detection/detect', { method: 'POST', body: fd });
-                if (!res.ok) { const e = await res.json().catch(() => null); throw new Error(e?.message || `Error ${res.status}`); }
-                const data = await res.json();
-                state.results.set(state.currentIndex, data);
-                updateThumbnailBadge(state.currentIndex, data.totalProblemsFound);
-                renderResults(data); drawDetections(data.detections);
-                showToast(data.totalProblemsFound > 0 ? 'success' : 'info',
-                    data.totalProblemsFound > 0 ? `Found ${data.totalProblemsFound} defect(s) in ${data.processingTimeMs}ms` : 'No defects detected.');
+                const fd = new FormData();
+                fd.append('image', file);
+                fd.append('confidence', getConfidenceValue());
+
+                // Fetch both standard and mapped in parallel
+                const [stdRes, mapRes] = await Promise.all([
+                    fetch('/api/detection/detect', { method: 'POST', body: fd }),
+                    fetch('/api/detection/detect-mapped', { method: 'POST', body: createFormData(file) })
+                ]);
+
+                if (!stdRes.ok) { const e = await stdRes.json().catch(() => null); throw new Error(e?.message || `Error ${stdRes.status}`); }
+
+                const stdData = await stdRes.json();
+                state.results.set(state.currentIndex, stdData);
+                updateThumbnailBadge(state.currentIndex, stdData.totalProblemsFound);
+
+                if (mapRes.ok) {
+                    const mapData = await mapRes.json();
+                    state.mappedResults.set(state.currentIndex, mapData);
+                }
+
+                // Render based on current mode
+                if (state.useMapped && state.mappedResults.has(state.currentIndex)) {
+                    renderMappedResults(state.mappedResults.get(state.currentIndex));
+                    drawDetections(extractDetectionsFromMapped(state.mappedResults.get(state.currentIndex)));
+                } else {
+                    renderResults(stdData);
+                    drawDetections(stdData.detections);
+                }
+
+                showToast(stdData.totalProblemsFound > 0 ? 'success' : 'info',
+                    stdData.totalProblemsFound > 0
+                        ? `Found ${stdData.totalProblemsFound} defect(s) in ${stdData.processingTimeMs}ms`
+                        : 'No defects detected.');
             } catch (err) { showToast('error', err.message); renderError(err.message); }
             finally { setProcessing(false); stopScan(); }
+        }
+
+        function createFormData(file) {
+            const fd = new FormData();
+            fd.append('image', file);
+            fd.append('confidence', getConfidenceValue());
+            return fd;
         }
 
         /* ============================================================
@@ -2028,7 +2579,6 @@
             setProcessing(true);
             const progress = $('videoProgress'), fill = $('videoProgressFill'), text = $('videoProgressText');
             progress.classList.add('visible'); fill.style.width = '0%'; text.textContent = 'Uploading video...';
-
             try {
                 const fd = new FormData();
                 fd.append('video', state.videoFile);
@@ -2047,7 +2597,6 @@
                 state.videoResult = data;
                 fill.style.width = '100%'; text.textContent = 'Complete!';
 
-                // Show annotated video if available
                 if (data.annotatedVideoUrl) {
                     videoPlayer.src = data.annotatedVideoUrl;
                     videoPlayer.style.display = 'block';
@@ -2086,12 +2635,32 @@
                     fill.style.width = (i / state.files.length * 100) + '%';
                     text.textContent = `Processing ${i + 1} of ${state.files.length}...`;
                     switchImage(i); startScan();
-                    const fd = new FormData(); fd.append('image', state.files[i]); fd.append('confidence', getConfidenceValue());
-                    const res = await fetch('/api/detection/detect', { method: 'POST', body: fd });
-                    if (!res.ok) { const e = await res.json().catch(() => null); throw new Error(e?.message || `Error on image ${i + 1}`); }
-                    const data = await res.json();
-                    state.results.set(i, data); updateThumbnailBadge(i, data.totalProblemsFound);
-                    if (i === state.currentIndex) { renderResults(data); drawDetections(data.detections); }
+
+                    const [stdRes, mapRes] = await Promise.all([
+                        fetch('/api/detection/detect', { method: 'POST', body: createFormData(state.files[i]) }),
+                        fetch('/api/detection/detect-mapped', { method: 'POST', body: createFormData(state.files[i]) })
+                    ]);
+
+                    if (!stdRes.ok) { const e = await stdRes.json().catch(() => null); throw new Error(e?.message || `Error on image ${i + 1}`); }
+
+                    const stdData = await stdRes.json();
+                    state.results.set(i, stdData);
+                    updateThumbnailBadge(i, stdData.totalProblemsFound);
+
+                    if (mapRes.ok) {
+                        const mapData = await mapRes.json();
+                        state.mappedResults.set(i, mapData);
+                    }
+
+                    if (i === state.currentIndex) {
+                        if (state.useMapped && state.mappedResults.has(i)) {
+                            renderMappedResults(state.mappedResults.get(i));
+                            drawDetections(extractDetectionsFromMapped(state.mappedResults.get(i)));
+                        } else {
+                            renderResults(stdData);
+                            drawDetections(stdData.detections);
+                        }
+                    }
                     stopScan();
                 }
                 fill.style.width = '100%'; text.textContent = 'All images processed!';
@@ -2105,12 +2674,18 @@
         /* ============================================================
            PROCESSING HELPERS
            ============================================================ */
-        function setProcessing(p) { state.isProcessing = p; detectBtn.classList.toggle('loading', p); detectAllBtn.classList.toggle('loading', p); updateButtons(); if (p) showSkeleton(); }
+        function setProcessing(p) {
+            state.isProcessing = p;
+            detectBtn.classList.toggle('loading', p);
+            detectAllBtn.classList.toggle('loading', p);
+            updateButtons();
+            if (p) showSkeleton();
+        }
         function startScan() { scanLine.classList.add('active'); }
         function stopScan() { scanLine.classList.remove('active'); }
 
         /* ============================================================
-           IMAGE RESULTS RENDERING
+           IMAGE RESULTS RENDERING (Standard)
            ============================================================ */
         function clearResults() {
             resultsBody.innerHTML = '<div class="no-detections"><span class="no-detections-icon">📋</span><span class="no-detections-sub">Results will appear here after detection</span></div>';
@@ -2126,29 +2701,148 @@
         function renderResults(data) {
             if (!data.success) { renderError(data.message); return; }
             let html = `<div class="summary-grid">
-            <div class="stat-card"><div class="stat-value ${data.totalProblemsFound > 0 ? 'danger' : 'success-color'}" id="defectCount">0</div><div class="stat-label">Defects Found</div></div>
-            <div class="stat-card"><div class="stat-value">${data.processingTimeMs}ms</div><div class="stat-label">Processing Time</div></div></div>`;
+                    <div class="stat-card"><div class="stat-value ${data.totalProblemsFound > 0 ? 'danger' : 'success-color'}" id="defectCount">0</div><div class="stat-label">Defects Found</div></div>
+                    <div class="stat-card"><div class="stat-value">${data.processingTimeMs}ms</div><div class="stat-label">Processing Time</div></div></div>`;
+
             if (state.currentImage) {
+                const modelSources = data.detections.length > 0
+                    ? [...new Set(data.detections.map(d => d.modelSource))].join(', ')
+                    : 'N/A';
                 html += `<div style="font-size:11px;color:var(--text-dim);margin-bottom:8px;display:flex;justify-content:space-between;">
-                <span>📐 ${state.currentImage.naturalWidth} × ${state.currentImage.naturalHeight}px</span>
-                <span>🤖 ${data.detections.length > 0 ? data.detections[0].modelSource : 'N/A'}</span></div>`;
+                        <span>📐 ${state.currentImage.naturalWidth} × ${state.currentImage.naturalHeight}px</span>
+                        <span>🤖 ${modelSources}</span></div>`;
             }
+
             if (!data.detections.length) {
                 html += '<div class="no-detections"><span class="no-detections-icon">✅</span><span class="no-detections-text">No defects detected</span><span class="no-detections-sub">Road surface appears in good condition.</span></div>';
             } else {
                 data.detections.forEach((det, i) => {
-                    const pct = Math.round(det.confidence * 100), color = getConfidenceHex(det.confidence), delay = (i * 0.08).toFixed(2);
+                    const pct = Math.round(det.confidence * 100);
+                    const color = getConfidenceHex(det.confidence);
+                    const delay = (i * 0.08).toFixed(2);
                     html += `<div class="detection-card" style="animation-delay:${delay}s;" onclick="toggleCoords(this)" onmouseenter="highlightBox(${i})" onmouseleave="unhighlightBox()">
-                    <div class="detection-card-header"><div class="detection-problem"><span class="detection-index" style="background:${color}22;color:${color};">${i + 1}</span>${det.problem}</div><span class="detection-confidence-text" style="color:${color};">${pct}%</span></div>
-                    <div class="confidence-bar"><div class="confidence-fill" style="background:${color};" data-width="${pct}"></div></div>
-                    <div class="detection-meta"><span>📷 ${det.modelSource}</span><span>${pct >= 70 ? '🟢 High' : pct >= 40 ? '🟡 Medium' : '🔴 Low'}</span></div>
-                    <div class="detection-coords">x:${det.box.x.toFixed(1)}, y:${det.box.y.toFixed(1)}, w:${det.box.width.toFixed(1)}, h:${det.box.height.toFixed(1)}</div></div>`;
+                            <div class="detection-card-header">
+                                <div class="detection-problem">
+                                    <span class="detection-index" style="background:${color}22;color:${color};">${i + 1}</span>${det.problem}
+                                </div>
+                                <span class="detection-confidence-text" style="color:${color};">${pct}%</span>
+                            </div>
+                            <div class="confidence-bar"><div class="confidence-fill" style="background:${color};" data-width="${pct}"></div></div>
+                            <div class="detection-meta">
+                                <span>🤖 ${det.modelSource}</span>
+                                <span>${pct >= 70 ? '🟢 High' : pct >= 40 ? '🟡 Medium' : '🔴 Low'}</span>
+                            </div>
+                            <div style="display:flex;gap:4px;margin-top:4px;">
+                                <span class="mapping-badge model-id">Model #${det.modelId}</span>
+                                <span class="mapping-badge model-id">Class #${det.classIndex}</span>
+                            </div>
+                            <div class="detection-coords">x:${det.box.x.toFixed(1)}, y:${det.box.y.toFixed(1)}, w:${det.box.width.toFixed(1)}, h:${det.box.height.toFixed(1)}</div>
+                        </div>`;
                 });
             }
             resultsBody.innerHTML = html;
             exportBtnEl.style.display = data.detections.length > 0 ? 'flex' : 'none';
             animateCount('defectCount', data.totalProblemsFound);
-            requestAnimationFrame(() => { document.querySelectorAll('.confidence-fill[data-width]').forEach(el => el.style.width = el.dataset.width + '%'); });
+            requestAnimationFrame(() => {
+                document.querySelectorAll('.confidence-fill[data-width]').forEach(el => el.style.width = el.dataset.width + '%');
+            });
+        }
+
+        /* ============================================================
+           MAPPED RESULTS RENDERING (External System)
+           ============================================================ */
+        function renderMappedResults(data) {
+            if (!data.success) { renderError(data.message); return; }
+
+            let html = `<div class="summary-grid">
+                    <div class="stat-card"><div class="stat-value ${data.totalProblemsFound > 0 ? 'danger' : 'success-color'}" id="defectCount">0</div><div class="stat-label">Defects Found</div></div>
+                    <div class="stat-card"><div class="stat-value">${data.processingTimeMs}ms</div><div class="stat-label">Processing Time</div></div>
+                    <div class="stat-card"><div class="stat-value" style="color:var(--purple);">${data.mappedDetections}</div><div class="stat-label">Mapped</div></div>
+                    <div class="stat-card"><div class="stat-value" style="color:${data.unmappedDetections > 0 ? 'var(--warning)' : 'var(--text-dim)'};">${data.unmappedDetections}</div><div class="stat-label">Unmapped</div></div></div>`;
+
+            // Mapped mode indicator
+            html += `<div style="font-size:11px;color:var(--purple);text-align:center;padding:6px;margin-bottom:8px;
+                    background:rgba(168,85,247,0.06);border-radius:var(--radius-sm);border:1px solid rgba(168,85,247,0.15);">
+                    📡 External System Mapped Output</div>`;
+
+            if (state.currentImage) {
+                const modelSources = data.detections.length > 0
+                    ? [...new Set(data.detections.map(d => d.modelSource))].join(', ')
+                    : 'N/A';
+                html += `<div style="font-size:11px;color:var(--text-dim);margin-bottom:8px;display:flex;justify-content:space-between;">
+                        <span>📐 ${state.currentImage.naturalWidth} × ${state.currentImage.naturalHeight}px</span>
+                        <span>🤖 ${modelSources}</span></div>`;
+            }
+
+            if (!data.detections.length) {
+                html += '<div class="no-detections"><span class="no-detections-icon">✅</span><span class="no-detections-text">No defects detected</span><span class="no-detections-sub">Road surface appears in good condition.</span></div>';
+            } else {
+                data.detections.forEach((det, i) => {
+                    const pct = Math.round(det.confidence * 100);
+                    const color = getConfidenceHex(det.confidence);
+                    const delay = (i * 0.08).toFixed(2);
+                    const displayName = det.externalClassName || det.internalClassName;
+                    const hasMapped = det.hasExternalMapping;
+
+                    html += `<div class="detection-card" style="animation-delay:${delay}s;" onclick="toggleCoords(this)" onmouseenter="highlightMappedBox(${i})" onmouseleave="unhighlightMappedBox()">
+                            <div class="detection-card-header">
+                                <div class="detection-problem">
+                                    <span class="detection-index" style="background:${color}22;color:${color};">${i + 1}</span>${displayName}
+                                </div>
+                                <span class="detection-confidence-text" style="color:${color};">${pct}%</span>
+                            </div>
+                            <div class="confidence-bar"><div class="confidence-fill" style="background:${color};" data-width="${pct}"></div></div>
+                            <div class="detection-meta">
+                                <span>🤖 ${det.modelSource}</span>
+                                <span>${pct >= 70 ? '🟢 High' : pct >= 40 ? '🟡 Medium' : '🔴 Low'}</span>
+                            </div>
+                            <div class="mapping-info">`;
+
+                    if (hasMapped) {
+                        html += `<span class="mapping-badge external">ExtID: ${det.externalClassId}</span>`;
+                        if (det.severity) {
+                            const sevClass = det.severity.toLowerCase() === 'high' ? 'severity-high'
+                                : det.severity.toLowerCase() === 'medium' ? 'severity-medium' : 'severity-low';
+                            html += `<span class="mapping-badge ${sevClass}">${det.severity}</span>`;
+                        }
+                        if (det.category) {
+                            html += `<span class="mapping-badge category">${det.category}</span>`;
+                        }
+                        html += `<span class="mapping-badge model-id">Model #${det.modelId} / Class #${det.internalClassIndex}</span>`;
+                        if (det.internalClassName !== det.externalClassName) {
+                            html += `<span class="mapping-badge unmapped" title="Internal name">🏷️ ${det.internalClassName}</span>`;
+                        }
+                    } else {
+                        html += `<span class="mapping-badge unmapped">⚠️ No external mapping</span>`;
+                        html += `<span class="mapping-badge model-id">Model #${det.modelId} / Class #${det.internalClassIndex}</span>`;
+                    }
+
+                    html += `</div>
+                            <div class="detection-coords">x:${det.box.x.toFixed(1)}, y:${det.box.y.toFixed(1)}, w:${det.box.width.toFixed(1)}, h:${det.box.height.toFixed(1)}</div>
+                        </div>`;
+                });
+            }
+            resultsBody.innerHTML = html;
+            exportBtnEl.style.display = data.detections.length > 0 ? 'flex' : 'none';
+            animateCount('defectCount', data.totalProblemsFound);
+            requestAnimationFrame(() => {
+                document.querySelectorAll('.confidence-fill[data-width]').forEach(el => el.style.width = el.dataset.width + '%');
+            });
+        }
+
+        function highlightMappedBox(index) {
+            if (!state.mappedResults.has(state.currentIndex)) return;
+            const data = state.mappedResults.get(state.currentIndex);
+            const dets = extractDetectionsFromMapped(data);
+            drawDetections(dets, index);
+            document.querySelectorAll('.detection-card').forEach((c, i) => c.classList.toggle('highlighted', i === index));
+        }
+        function unhighlightMappedBox() {
+            if (!state.mappedResults.has(state.currentIndex)) return;
+            const data = state.mappedResults.get(state.currentIndex);
+            const dets = extractDetectionsFromMapped(data);
+            drawDetections(dets, -1);
+            document.querySelectorAll('.detection-card').forEach(c => c.classList.remove('highlighted'));
         }
 
         /* ============================================================
@@ -2156,72 +2850,66 @@
            ============================================================ */
         function renderVideoResults(data) {
             if (!data.success) { renderError(data.message); return; }
-
             const uniqueCount = data.totalUniqueDefects || data.totalDefectsFound || 0;
             const rawCount = data.totalRawDetections || uniqueCount;
 
             let html = '';
 
-            // Video metadata
             html += `<div class="video-info-grid">
-            <div class="video-info-item"><div class="video-info-value">${data.videoDuration}</div><div class="video-info-label">Duration</div></div>
-            <div class="video-info-item"><div class="video-info-value">${data.videoFps}fps</div><div class="video-info-label">Frame Rate</div></div>
-            <div class="video-info-item"><div class="video-info-value">${data.videoWidth}×${data.videoHeight}</div><div class="video-info-label">Resolution</div></div></div>`;
+                    <div class="video-info-item"><div class="video-info-value">${data.videoDuration}</div><div class="video-info-label">Duration</div></div>
+                    <div class="video-info-item"><div class="video-info-value">${data.videoFps}fps</div><div class="video-info-label">Frame Rate</div></div>
+                    <div class="video-info-item"><div class="video-info-value">${data.videoWidth}×${data.videoHeight}</div><div class="video-info-label">Resolution</div></div></div>`;
 
-            // Stats
             html += `<div class="summary-grid">
-            <div class="stat-card"><div class="stat-value ${uniqueCount > 0 ? 'danger' : 'success-color'}" id="defectCount">0</div><div class="stat-label">Unique Defects</div></div>
-            <div class="stat-card"><div class="stat-value">${rawCount}</div><div class="stat-label">Raw Detections</div></div>
-            <div class="stat-card"><div class="stat-value ${data.framesWithDefects > 0 ? 'danger' : 'success-color'}">${data.framesWithDefects}</div><div class="stat-label">Frames w/ Defects</div></div>
-            <div class="stat-card"><div class="stat-value">${(data.processingTimeMs / 1000).toFixed(1)}s</div><div class="stat-label">Total Time</div></div></div>`;
+                    <div class="stat-card"><div class="stat-value ${uniqueCount > 0 ? 'danger' : 'success-color'}" id="defectCount">0</div><div class="stat-label">Unique Defects</div></div>
+                    <div class="stat-card"><div class="stat-value">${rawCount}</div><div class="stat-label">Raw Detections</div></div>
+                    <div class="stat-card"><div class="stat-value ${data.framesWithDefects > 0 ? 'danger' : 'success-color'}">${data.framesWithDefects}</div><div class="stat-label">Frames w/ Defects</div></div>
+                    <div class="stat-card"><div class="stat-value">${(data.processingTimeMs / 1000).toFixed(1)}s</div><div class="stat-label">Total Time</div></div></div>`;
 
-            // Deduplication info
             if (rawCount > uniqueCount) {
                 const eliminated = rawCount - uniqueCount;
                 const pct = ((eliminated / rawCount) * 100).toFixed(0);
                 html += `<div style="font-size:12px;color:var(--text-secondary);text-align:center;padding:8px;margin-bottom:8px;background:rgba(0,212,255,0.05);border-radius:var(--radius-sm);border:1px solid var(--accent-dim);">
-                🎯 Tracking eliminated <strong>${eliminated}</strong> duplicate(s) (${pct}% reduction)</div>`;
+                        🎯 Tracking eliminated <strong>${eliminated}</strong> duplicate(s) (${pct}% reduction)</div>`;
             }
 
-            // Annotated video download
             if (data.annotatedVideoUrl) {
                 html += `<a href="${data.annotatedVideoUrl}" download class="download-video-btn">📥 Download Annotated Video</a>`;
             }
 
-            // Tabs
             html += `<div class="result-tabs" style="margin-top:12px;">
-            <button class="result-tab active" onclick="switchVideoTab('unique',this)">🎯 Unique Defects (${uniqueCount})</button>
-            <button class="result-tab" onclick="switchVideoTab('timeline',this)">🕐 Timeline (${data.frameResults?.length || 0})</button>
-            <button class="result-tab" onclick="switchVideoTab('breakdown',this)">📊 Breakdown</button></div>`;
+                    <button class="result-tab active" onclick="switchVideoTab('unique',this)">🎯 Unique (${uniqueCount})</button>
+                    <button class="result-tab" onclick="switchVideoTab('timeline',this)">🕐 Timeline (${data.frameResults?.length || 0})</button>
+                    <button class="result-tab" onclick="switchVideoTab('breakdown',this)">📊 Breakdown</button></div>`;
 
-            // === Unique Defects Tab ===
+            // Unique Defects Tab
             html += '<div class="tab-content active" id="tab-unique">';
             if (data.uniqueDefects && data.uniqueDefects.length > 0) {
                 data.uniqueDefects.forEach((ud, i) => {
                     const pct = Math.round(ud.bestConfidence * 100);
                     const color = getTrackColor(ud.trackId);
                     const delay = Math.min(i * 0.05, 0.8).toFixed(2);
-                    html += `<div class="unique-defect-card" style="animation-delay:${delay}s;border-left:3px solid ${color};"
-                        onclick="seekToTimestamp(${ud.bestTimestamp})">
-                    <div class="unique-defect-header">
-                        <div class="unique-defect-name">
-                            <span class="track-badge" style="background:${color}22;color:${color};">#${ud.trackId}</span>
-                            ${ud.defectClass}
-                        </div>
-                        <span style="font-size:13px;font-weight:600;color:${getConfidenceHex(ud.bestConfidence)};">${pct}%</span>
-                    </div>
-                    <div class="unique-defect-meta">
-                        <span>📍 First: ${formatTs(ud.firstSeenTimestamp)}</span>
-                        <span>📍 Last: ${formatTs(ud.lastSeenTimestamp)}</span>
-                        <span>👁️ ${ud.totalFrameAppearances} frame(s)</span>
-                    </div></div>`;
+                    html += `<div class="unique-defect-card" style="animation-delay:${delay}s;border-left:3px solid ${color};" onclick="seekToTimestamp(${ud.bestTimestamp})">
+                            <div class="unique-defect-header">
+                                <div class="unique-defect-name">
+                                    <span class="track-badge" style="background:${color}22;color:${color};">#${ud.trackId}</span>
+                                    ${ud.defectClass}
+                                </div>
+                                <span style="font-size:13px;font-weight:600;color:${getConfidenceHex(ud.bestConfidence)};">${pct}%</span>
+                            </div>
+                            <div class="unique-defect-meta">
+                                <span>📍 First: ${formatTs(ud.firstSeenTimestamp)}</span>
+                                <span>📍 Last: ${formatTs(ud.lastSeenTimestamp)}</span>
+                                <span>👁️ ${ud.totalFrameAppearances} frame(s)</span>
+                                <span>🤖 ${ud.modelSource || 'N/A'}</span>
+                            </div></div>`;
                 });
             } else {
                 html += '<div class="no-detections"><span class="no-detections-icon">✅</span><span class="no-detections-text">No defects detected</span></div>';
             }
             html += '</div>';
 
-            // === Timeline Tab ===
+            // Timeline Tab
             html += '<div class="tab-content" id="tab-timeline"><div class="frame-timeline">';
             if (data.frameResults) {
                 data.frameResults.forEach((frame, i) => {
@@ -2230,54 +2918,43 @@
                     const defList = has
                         ? frame.detections.map(d => d.problem).filter((v, idx, a) => a.indexOf(v) === idx).join(', ')
                         : 'No defects';
-
-                    // Show track IDs if available
                     let trackInfo = '';
                     if (frame.trackIds && frame.trackIds.length > 0) {
                         trackInfo = frame.trackIds.map(tid =>
                             `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${getTrackColor(tid)};margin-right:2px;" title="Track #${tid}"></span>`
                         ).join('');
                     }
-
-                    html += `<div class="frame-card ${has ? 'has-defects' : 'clean'}" style="animation-delay:${delay}s;"
-                        onclick="seekToTimestamp(${frame.timestampSeconds})">
-                    <span class="frame-timestamp">${frame.timestamp}</span>
-                    <div class="frame-info">
-                        <div class="frame-defect-count">Frame #${frame.frameNumber} ${trackInfo}</div>
-                        <div class="frame-defect-list">${defList}</div>
-                    </div>
-                    <span class="frame-badge ${has ? 'danger' : 'success'}">${has ? frame.defectsInFrame : '✓'}</span></div>`;
+                    html += `<div class="frame-card ${has ? 'has-defects' : 'clean'}" style="animation-delay:${delay}s;" onclick="seekToTimestamp(${frame.timestampSeconds})">
+                            <span class="frame-timestamp">${frame.timestamp}</span>
+                            <div class="frame-info">
+                                <div class="frame-defect-count">Frame #${frame.frameNumber} ${trackInfo}</div>
+                                <div class="frame-defect-list">${defList}</div>
+                            </div>
+                            <span class="frame-badge ${has ? 'danger' : 'success'}">${has ? frame.defectsInFrame : '✓'}</span></div>`;
                 });
             }
             html += '</div></div>';
 
-            // === Breakdown Tab ===
+            // Breakdown Tab
             html += '<div class="tab-content" id="tab-breakdown">';
-
-            // Unique breakdown
             const defSummary = data.defectSummary || {};
             if (Object.keys(defSummary).length > 0) {
-                html += '<div style="font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:6px;">Unique Defects by Type</div>';
-                html += '<div class="defect-summary">';
+                html += '<div style="font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:6px;">Unique Defects by Type</div><div class="defect-summary">';
                 for (const [name, count] of Object.entries(defSummary)) {
                     html += `<div class="defect-summary-item"><span class="defect-summary-count">${count}</span><span class="defect-summary-name">${name}</span></div>`;
                 }
                 html += '</div>';
             }
-
-            // Raw breakdown
             const rawSummary = data.rawDefectSummary || {};
             if (Object.keys(rawSummary).length > 0) {
-                html += '<div style="font-size:12px;font-weight:600;color:var(--text-secondary);margin:8px 0 6px;">Raw Detections by Type (before tracking)</div>';
-                html += '<div class="defect-summary">';
+                html += '<div style="font-size:12px;font-weight:600;color:var(--text-secondary);margin:8px 0 6px;">Raw Detections by Type (before tracking)</div><div class="defect-summary">';
                 for (const [name, count] of Object.entries(rawSummary)) {
                     html += `<div class="defect-summary-item"><span class="defect-summary-count" style="color:var(--text-secondary);">${count}</span><span class="defect-summary-name">${name}</span></div>`;
                 }
                 html += '</div>';
             }
-
             html += `<div style="font-size:11px;color:var(--text-dim);margin-top:12px;text-align:center;">
-            Avg ${data.avgTimePerFrameMs}ms/frame · Every ${data.frameIntervalUsed}th frame analyzed</div>`;
+                    Avg ${data.avgTimePerFrameMs}ms/frame · Every ${data.frameIntervalUsed}th frame analyzed</div>`;
             html += '</div>';
 
             resultsBody.innerHTML = html;
@@ -2306,7 +2983,6 @@
         }
 
         function formatTs(seconds) {
-            const ts = new Date(seconds * 1000);
             const m = Math.floor(seconds / 60).toString().padStart(2, '0');
             const s = (seconds % 60).toFixed(1).padStart(4, '0');
             return `${m}:${s}`;
@@ -2343,18 +3019,24 @@
         function exportReport() {
             let report;
             if (state.mode === 'video' && state.videoResult) {
-                report = { exportedAt: new Date().toISOString(), type: 'video', videoResult: state.videoResult };
+                report = { exportedAt: new Date().toISOString(), type: 'video', outputMode: state.useMapped ? 'mapped' : 'standard', videoResult: state.videoResult };
             } else {
-                const all = {};
-                state.results.forEach((v, k) => { all[state.files[k]?.name || `image_${k}`] = v; });
+                const stdAll = {}, mapAll = {};
+                state.results.forEach((v, k) => { stdAll[state.files[k]?.name || `image_${k}`] = v; });
+                state.mappedResults.forEach((v, k) => { mapAll[state.files[k]?.name || `image_${k}`] = v; });
                 report = {
-                    exportedAt: new Date().toISOString(), type: 'image', totalImages: state.results.size,
-                    totalDefects: Array.from(state.results.values()).reduce((s, r) => s + r.totalProblemsFound, 0), results: all
+                    exportedAt: new Date().toISOString(),
+                    type: 'image',
+                    outputMode: state.useMapped ? 'mapped' : 'standard',
+                    totalImages: state.results.size,
+                    totalDefects: Array.from(state.results.values()).reduce((s, r) => s + r.totalProblemsFound, 0),
+                    standardResults: stdAll,
+                    mappedResults: mapAll
                 };
             }
             const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
             const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-            a.download = `defect-report-${Date.now()}.json`; a.click();
+            a.download = `defect-report-${state.useMapped ? 'mapped-' : ''}${Date.now()}.json`; a.click();
             showToast('success', 'Report downloaded!');
         }
 

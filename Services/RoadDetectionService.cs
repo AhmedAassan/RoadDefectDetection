@@ -15,8 +15,8 @@ namespace RoadDefectDetection.Services
     /// them for the lifetime of the application. When a detection request arrives,
     /// all models run in parallel against the same image, and results are merged.
     /// 
-    /// To add a new model: drop the .onnx file in the Models folder, add an entry
-    /// to the "Models" array in appsettings.json, and restart. No code changes needed.
+    /// Now passes ModelId to each YoloDetector so detections carry the model
+    /// identifier needed for external system mapping.
     /// </summary>
     public sealed class RoadDetectionService : IDetectionService, IDisposable
     {
@@ -25,13 +25,6 @@ namespace RoadDefectDetection.Services
         private readonly DetectionSettings _settings;
         private bool _disposed;
 
-        /// <summary>
-        /// Initializes the detection service by loading all enabled ONNX models.
-        /// Models that cannot be found or fail to load are skipped with a warning — 
-        /// the service will still start with whatever models loaded successfully.
-        /// </summary>
-        /// <param name="configuration">Application configuration containing DetectionSettings and Models sections.</param>
-        /// <param name="logger">Logger instance for diagnostic output.</param>
         public RoadDetectionService(IConfiguration configuration, ILogger<RoadDetectionService> logger)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -64,7 +57,24 @@ namespace RoadDefectDetection.Services
             _logger.LogInformation("Found {Count} model configuration(s). Loading enabled models...", modelConfigs.Count);
 
             // ------------------------------------------------------------------
-            // 3. Load each enabled model
+            // 3. Validate ModelId uniqueness
+            // ------------------------------------------------------------------
+            var duplicateIds = modelConfigs
+                .Where(m => m.Enabled)
+                .GroupBy(m => m.ModelId)
+                .Where(g => g.Count() > 1)
+                .Select(g => g.Key)
+                .ToList();
+
+            if (duplicateIds.Count > 0)
+            {
+                _logger.LogError(
+                    "Duplicate ModelId(s) found: [{Ids}]. Each model must have a unique ModelId.",
+                    string.Join(", ", duplicateIds));
+            }
+
+            // ------------------------------------------------------------------
+            // 4. Load each enabled model
             // ------------------------------------------------------------------
             string modelsDirectory = Path.Combine(Directory.GetCurrentDirectory(), "Models");
 
@@ -78,7 +88,8 @@ namespace RoadDefectDetection.Services
             {
                 if (!config.Enabled)
                 {
-                    _logger.LogInformation("Model '{ModelName}' is disabled. Skipping.", config.Name);
+                    _logger.LogInformation("Model '{ModelName}' (ID: {ModelId}) is disabled. Skipping.",
+                        config.Name, config.ModelId);
                     continue;
                 }
 
@@ -87,15 +98,14 @@ namespace RoadDefectDetection.Services
                 if (!File.Exists(modelPath))
                 {
                     _logger.LogWarning(
-                        "Model file not found: '{ModelPath}'. Skipping model '{ModelName}'. " +
+                        "Model file not found: '{ModelPath}'. Skipping model '{ModelName}' (ID: {ModelId}). " +
                         "Place the .onnx file in the Models folder and restart.",
-                        modelPath, config.Name);
+                        modelPath, config.Name, config.ModelId);
                     continue;
                 }
 
                 try
                 {
-                    // Use model-specific threshold, fall back to global default
                     float threshold = config.ConfidenceThreshold > 0
                         ? config.ConfidenceThreshold
                         : _settings.DefaultConfidenceThreshold;
@@ -106,13 +116,16 @@ namespace RoadDefectDetection.Services
                         confidenceThreshold: threshold,
                         iouThreshold: _settings.IouThreshold,
                         modelName: config.Name,
+                        modelId: config.ModelId,
                         inputSize: _settings.InputSize);
 
                     _detectors.Add(detector);
 
                     _logger.LogInformation(
-                        "Successfully loaded model '{ModelName}' ({FileName}) with {ClassCount} classes: [{Classes}].",
+                        "Successfully loaded model '{ModelName}' (ID: {ModelId}, File: {FileName}) " +
+                        "with {ClassCount} classes: [{Classes}].",
                         config.Name,
+                        config.ModelId,
                         config.FileName,
                         config.Classes.Length,
                         string.Join(", ", config.Classes));
@@ -121,8 +134,9 @@ namespace RoadDefectDetection.Services
                 {
                     _logger.LogError(
                         ex,
-                        "Failed to load model '{ModelName}' from '{FileName}'. This model will be unavailable.",
-                        config.Name, config.FileName);
+                        "Failed to load model '{ModelName}' (ID: {ModelId}) from '{FileName}'. " +
+                        "This model will be unavailable.",
+                        config.Name, config.ModelId, config.FileName);
                 }
             }
 
@@ -131,16 +145,9 @@ namespace RoadDefectDetection.Services
                 _detectors.Count, modelConfigs.Count(m => m.Enabled));
         }
 
-        /// <summary>
-        /// Analyzes a single image for road defects using all loaded models in parallel.
-        /// 
-        /// Each model runs on a separate thread via Task.Run. Results from all models
-        /// are merged into a single list sorted by confidence descending.
-        /// </summary>
-        /// <param name="imageBytes">Raw bytes of the image file.</param>
-        /// <param name="imageName">Original file name for tracking in the response.</param>
-        /// <returns>A <see cref="DetectionResponse"/> containing aggregated detections from all models.</returns>
-        public async Task<DetectionResponse> DetectAsync(byte[] imageBytes, string imageName, float? confidenceThreshold = null)
+        /// <inheritdoc />
+        public async Task<DetectionResponse> DetectAsync(
+            byte[] imageBytes, string imageName, float? confidenceThreshold = null)
         {
             var stopwatch = Stopwatch.StartNew();
 
@@ -160,21 +167,13 @@ namespace RoadDefectDetection.Services
 
             try
             {
-                // If the user sold confidence as a percentage (0-100), convert it to (0-1)
                 float? normalizedConfidence = null;
                 if (confidenceThreshold.HasValue)
                 {
-                    // If the value is greater than 1, the user will still sell it as a percentage
-                    if (confidenceThreshold.Value > 1.0f)
-                    {
-                        normalizedConfidence = confidenceThreshold.Value / 100f;
-                    }
-                    else
-                    {
-                        normalizedConfidence = confidenceThreshold.Value;
-                    }
+                    normalizedConfidence = confidenceThreshold.Value > 1.0f
+                        ? confidenceThreshold.Value / 100f
+                        : confidenceThreshold.Value;
 
-                    // Clamp between 0 and 1
                     normalizedConfidence = Math.Clamp(normalizedConfidence.Value, 0.01f, 1.0f);
                 }
 
@@ -229,63 +228,47 @@ namespace RoadDefectDetection.Services
             }
         }
 
-        /// <summary>
-        /// Analyzes multiple images sequentially. Each image is processed with all
-        /// models in parallel (via <see cref="DetectAsync"/>), but images are handled
-        /// one at a time to prevent excessive resource consumption.
-        /// </summary>
-        /// <param name="images">List of tuples containing image bytes and file names.</param>
-        /// <returns>A list of <see cref="DetectionResponse"/>, one per input image, in the same order.</returns>
+        /// <inheritdoc />
         public async Task<List<DetectionResponse>> DetectMultipleAsync(
-        List<(byte[] bytes, string name)> images, float? confidenceThreshold = null)
+            List<(byte[] bytes, string name)> images, float? confidenceThreshold = null)
+        {
+            _logger.LogInformation("Starting batch detection on {Count} image(s).", images.Count);
+
+            var responses = new List<DetectionResponse>(images.Count);
+
+            foreach (var (bytes, name) in images)
             {
-                _logger.LogInformation("Starting batch detection on {Count} image(s).", images.Count);
-
-                var responses = new List<DetectionResponse>(images.Count);
-
-                foreach (var (bytes, name) in images)
-                {
-                    var response = await DetectAsync(bytes, name, confidenceThreshold);
-                    responses.Add(response);
-                }
-
-                int totalDefects = responses.Sum(r => r.TotalProblemsFound);
-                _logger.LogInformation(
-                    "Batch detection complete. Processed {ImageCount} image(s), found {DefectCount} total defect(s).",
-                    images.Count, totalDefects);
-
-                return responses;
+                var response = await DetectAsync(bytes, name, confidenceThreshold);
+                responses.Add(response);
             }
 
-        /// <summary>
-        /// Returns metadata about all currently loaded models.
-        /// Useful for admin dashboards and health-check UIs.
-        /// </summary>
-        /// <returns>A list of objects with Name, Classes, ClassCount, and Status properties.</returns>
+            int totalDefects = responses.Sum(r => r.TotalProblemsFound);
+            _logger.LogInformation(
+                "Batch detection complete. Processed {ImageCount} image(s), found {DefectCount} total defect(s).",
+                images.Count, totalDefects);
+
+            return responses;
+        }
+
+        /// <inheritdoc />
         public List<object> GetLoadedModels()
         {
             return _detectors.Select(d => (object)new
             {
                 Name = d.ModelName,
+                d.ModelId,
                 Classes = d.ClassNames,
                 ClassCount = d.ClassNames.Length,
                 Status = "Loaded"
             }).ToList();
         }
 
-        /// <summary>
-        /// Returns true if at least one ONNX model is loaded and ready for inference.
-        /// </summary>
-        /// <returns>True if operational; false if no models could be loaded.</returns>
+        /// <inheritdoc />
         public bool IsHealthy()
         {
             return _detectors.Count > 0;
         }
 
-        /// <summary>
-        /// Disposes all <see cref="YoloDetector"/> instances and their underlying ONNX sessions.
-        /// Called automatically when the DI container is disposed at shutdown.
-        /// </summary>
         public void Dispose()
         {
             if (!_disposed)
@@ -294,10 +277,7 @@ namespace RoadDefectDetection.Services
 
                 foreach (var detector in _detectors)
                 {
-                    try
-                    {
-                        detector.Dispose();
-                    }
+                    try { detector.Dispose(); }
                     catch (Exception ex)
                     {
                         _logger.LogError(ex, "Error disposing detector '{ModelName}'.", detector.ModelName);

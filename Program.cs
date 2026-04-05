@@ -24,8 +24,8 @@ namespace RoadDefectDetection
                     Version = "v1",
                     Description =
                         "Analyzes road images and videos for surface defects " +
-                        "using YOLO models. Supports object tracking and " +
-                        "annotated video output."
+                        "using YOLO models. Supports object tracking, " +
+                        "annotated video output, and external system class mapping."
                 });
             });
 
@@ -37,7 +37,15 @@ namespace RoadDefectDetection
                 return new RoadDetectionService(config, logger);
             });
 
-            // Video cache (singleton - lives for app lifetime)
+            // ── External Mapping Service ────────────────────────
+            builder.Services.AddSingleton<IExternalMappingService>(provider =>
+            {
+                var config = builder.Configuration;
+                var logger = provider.GetRequiredService<ILogger<ExternalMappingService>>();
+                return new ExternalMappingService(config, logger);
+            });
+
+            // Video cache (singleton — lives for app lifetime)
             builder.Services.AddSingleton<AnnotatedVideoCache>();
 
             // Video detection (singleton)
@@ -91,6 +99,13 @@ namespace RoadDefectDetection
             log.LogInformation(det.IsHealthy()
                 ? "Detection service healthy."
                 : "WARNING: No models loaded.");
+
+            var mapper = app.Services.GetRequiredService<IExternalMappingService>();
+            var mappings = mapper.GetAllMappings();
+            log.LogInformation(
+                "External mapping service: {Count} mapping(s) configured across {Models} model(s).",
+                mappings.Count,
+                mappings.Select(m => m.ModelId).Distinct().Count());
 
             var vid = app.Services.GetRequiredService<IVideoDetectionService>();
             var ffmpegOk = vid.IsAvailableAsync().GetAwaiter().GetResult();
