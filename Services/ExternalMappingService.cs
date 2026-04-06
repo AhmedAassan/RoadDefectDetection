@@ -1,36 +1,19 @@
-﻿using RoadDefectDetection.Configuration;
+﻿using Microsoft.Extensions.Options;
+using RoadDefectDetection.Configuration;
 using RoadDefectDetection.DTOs;
 using RoadDefectDetection.Services.Interfaces;
 
 namespace RoadDefectDetection.Services
 {
     /// <summary>
-    /// Configuration-driven mapping service that translates internal model
-    /// detections to external system class IDs.
-    /// 
-    /// Mappings are loaded once at startup from the "ExternalClassMappings"
-    /// section of appsettings.json and stored in a dictionary keyed by
-    /// (ModelId, InternalClassIndex) for O(1) lookups.
-    /// 
-    /// To add or modify mappings, edit appsettings.json — no code changes needed.
-    /// To add mappings for a new model, just add new entries with the new ModelId.
-    /// 
-    /// Thread-safe: the mapping dictionary is built once at construction
-    /// and never modified afterward (effectively immutable).
+    /// Configuration-driven service that maps internal model detections
+    /// to external system class IDs. Thread-safe: the lookup dictionary
+    /// is built once at construction and never modified.
     /// </summary>
     public sealed class ExternalMappingService : IExternalMappingService
     {
-        /// <summary>
-        /// All mappings loaded from configuration.
-        /// </summary>
         private readonly List<ExternalClassMapping> _allMappings;
-
-        /// <summary>
-        /// Fast lookup dictionary. Key = (ModelId, InternalClassIndex).
-        /// Built once at construction time.
-        /// </summary>
-        private readonly Dictionary<(int ModelId, int ClassIndex), ExternalClassMapping> _mappingLookup;
-
+        private readonly Dictionary<(int ModelId, int ClassIndex), ExternalClassMapping> _lookup;
         private readonly ILogger<ExternalMappingService> _logger;
 
         public ExternalMappingService(
@@ -38,65 +21,39 @@ namespace RoadDefectDetection.Services
             ILogger<ExternalMappingService> logger)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-
-            // ── Load mappings from configuration ────────────────
             _allMappings = new List<ExternalClassMapping>();
             configuration.GetSection("ExternalClassMappings").Bind(_allMappings);
 
-            // ── Build fast lookup dictionary ────────────────────
-            _mappingLookup = new Dictionary<(int, int), ExternalClassMapping>();
+            _lookup = new Dictionary<(int, int), ExternalClassMapping>();
 
-            foreach (var mapping in _allMappings)
+            foreach (var m in _allMappings)
             {
-                var key = (mapping.ModelId, mapping.InternalModelClassIndex);
-
-                if (_mappingLookup.ContainsKey(key))
+                var key = (m.ModelId, m.InternalModelClassIndex);
+                if (_lookup.ContainsKey(key))
                 {
                     _logger.LogWarning(
-                        "Duplicate external mapping for ModelId={ModelId}, ClassIndex={ClassIndex}. " +
-                        "Keeping first occurrence (ExternalClassId={ExistingId}), " +
-                        "ignoring duplicate (ExternalClassId={DuplicateId}).",
-                        mapping.ModelId,
-                        mapping.InternalModelClassIndex,
-                        _mappingLookup[key].ExternalClassId,
-                        mapping.ExternalClassId);
+                        "Duplicate mapping for ModelId={ModelId}, ClassIndex={ClassIndex}. " +
+                        "Keeping ExternalClassId={Existing}, ignoring ExternalClassId={Dup}.",
+                        m.ModelId, m.InternalModelClassIndex,
+                        _lookup[key].ExternalClassId, m.ExternalClassId);
                     continue;
                 }
-
-                _mappingLookup[key] = mapping;
+                _lookup[key] = m;
             }
 
             _logger.LogInformation(
-                "External mapping service initialized with {Total} mapping(s) " +
-                "across {Models} model(s). Lookup entries: {Lookup}.",
+                "External mapping service: {Total} mapping(s), {Models} model(s), {Lookup} lookup entries.",
                 _allMappings.Count,
                 _allMappings.Select(m => m.ModelId).Distinct().Count(),
-                _mappingLookup.Count);
-
-            // Log each mapping for visibility
-            foreach (var mapping in _allMappings)
-            {
-                _logger.LogDebug(
-                    "  Mapping: Model {ModelId} ClassIdx {ClassIdx} → " +
-                    "ExternalId {ExtId} '{ExtName}' [{Severity}/{Category}]",
-                    mapping.ModelId,
-                    mapping.InternalModelClassIndex,
-                    mapping.ExternalClassId,
-                    mapping.ExternalClassName,
-                    mapping.Severity,
-                    mapping.Category);
-            }
+                _lookup.Count);
         }
 
-        /// <inheritdoc />
         public MappedDetectionResult MapDetection(DetectionResult detection)
         {
-            if (detection == null)
-                throw new ArgumentNullException(nameof(detection));
+            ArgumentNullException.ThrowIfNull(detection);
 
             var mapped = new MappedDetectionResult
             {
-                // ── Copy internal data ──────────────────────────
                 InternalClassName = detection.Problem,
                 InternalClassIndex = detection.ClassIndex,
                 ModelId = detection.ModelId,
@@ -105,52 +62,35 @@ namespace RoadDefectDetection.Services
                 Box = detection.Box
             };
 
-            // ── Look up external mapping ────────────────────────
-            var key = (detection.ModelId, detection.ClassIndex);
-
-            if (_mappingLookup.TryGetValue(key, out var externalMapping))
+            if (_lookup.TryGetValue((detection.ModelId, detection.ClassIndex), out var ext))
             {
-                mapped.ExternalClassId = externalMapping.ExternalClassId;
-                mapped.ExternalClassName = externalMapping.ExternalClassName;
-                mapped.Severity = externalMapping.Severity;
-                mapped.Category = externalMapping.Category;
+                mapped.ExternalClassId = ext.ExternalClassId;
+                mapped.ExternalClassName = ext.ExternalClassName;
+                mapped.Severity = ext.Severity;
+                mapped.Category = ext.Category;
             }
             else
             {
                 _logger.LogDebug(
-                    "No external mapping found for ModelId={ModelId}, " +
-                    "ClassIndex={ClassIndex} ('{ClassName}'). " +
-                    "Detection will be returned without external mapping.",
-                    detection.ModelId,
-                    detection.ClassIndex,
-                    detection.Problem);
+                    "No external mapping for ModelId={ModelId}, ClassIndex={ClassIndex} ('{Name}').",
+                    detection.ModelId, detection.ClassIndex, detection.Problem);
             }
 
             return mapped;
         }
 
-        /// <inheritdoc />
         public MappedDetectionResponse MapResponse(DetectionResponse response)
         {
-            if (response == null)
-                throw new ArgumentNullException(nameof(response));
+            ArgumentNullException.ThrowIfNull(response);
 
-            var mappedDetections = response.Detections
-                .Select(MapDetection)
-                .ToList();
+            var dets = response.Detections.Select(MapDetection).ToList();
+            int mappedCount = dets.Count(d => d.HasExternalMapping);
+            int unmapped = dets.Count(d => !d.HasExternalMapping);
 
-            int mappedCount = mappedDetections.Count(d => d.HasExternalMapping);
-            int unmappedCount = mappedDetections.Count(d => !d.HasExternalMapping);
-
-            if (unmappedCount > 0)
-            {
+            if (unmapped > 0)
                 _logger.LogWarning(
-                    "Image '{ImageName}': {Unmapped} of {Total} detection(s) " +
-                    "have no external mapping.",
-                    response.ImageName,
-                    unmappedCount,
-                    mappedDetections.Count);
-            }
+                    "'{Name}': {Unmapped}/{Total} detection(s) have no external mapping.",
+                    response.ImageName, unmapped, dets.Count);
 
             return new MappedDetectionResponse
             {
@@ -159,31 +99,22 @@ namespace RoadDefectDetection.Services
                 ImageName = response.ImageName,
                 TotalProblemsFound = response.TotalProblemsFound,
                 MappedDetections = mappedCount,
-                UnmappedDetections = unmappedCount,
+                UnmappedDetections = unmapped,
                 ProcessingTimeMs = response.ProcessingTimeMs,
-                Detections = mappedDetections
+                Detections = dets
             };
         }
 
-        /// <inheritdoc />
         public List<ExternalClassMapping> GetAllMappings()
-        {
-            return _allMappings.ToList(); // Return copy
-        }
+            => _allMappings.ToList();
 
-        /// <inheritdoc />
         public List<ExternalClassMapping> GetMappingsForModel(int modelId)
-        {
-            return _allMappings
-                .Where(m => m.ModelId == modelId)
-                .ToList();
-        }
+            => _allMappings.Where(m => m.ModelId == modelId).ToList();
 
-        /// <inheritdoc />
         public ExternalClassMapping? GetMapping(int modelId, int classIndex)
         {
-            _mappingLookup.TryGetValue((modelId, classIndex), out var mapping);
-            return mapping;
+            _lookup.TryGetValue((modelId, classIndex), out var m);
+            return m;
         }
     }
 }

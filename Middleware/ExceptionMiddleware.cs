@@ -4,46 +4,34 @@ using System.Text.Json;
 namespace RoadDefectDetection.Middleware
 {
     /// <summary>
-    /// Global exception handling middleware. Catches any unhandled exception that
-    /// escapes the request pipeline, logs it, and returns a consistent JSON error
-    /// response to the client.
+    /// Global exception handler. Catches unhandled exceptions, logs them,
+    /// and returns a consistent JSON response.
     /// 
-    /// This prevents raw exception details or stack traces from leaking to callers
-    /// while ensuring every error produces a machine-readable response.
-    /// 
-    /// Must be registered early in the pipeline (before routing/controllers)
-    /// via <c>app.UseMiddleware&lt;ExceptionMiddleware&gt;()</c>.
+    /// In Development, the exception message is included in the response.
+    /// In Production, only a generic message is returned to avoid leaking internals.
     /// </summary>
     public class ExceptionMiddleware
     {
         private readonly RequestDelegate _next;
         private readonly ILogger<ExceptionMiddleware> _logger;
+        private readonly IHostEnvironment _environment;
 
-        /// <summary>
-        /// JSON serialization options for error responses — camelCase property names
-        /// for consistency with ASP.NET Core defaults.
-        /// </summary>
         private static readonly JsonSerializerOptions JsonOptions = new()
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             WriteIndented = false
         };
 
-        /// <summary>
-        /// Initializes the middleware with the next delegate in the pipeline and a logger.
-        /// </summary>
-        /// <param name="next">The next middleware delegate.</param>
-        /// <param name="logger">Logger for recording exception details.</param>
-        public ExceptionMiddleware(RequestDelegate next, ILogger<ExceptionMiddleware> logger)
+        public ExceptionMiddleware(
+            RequestDelegate next,
+            ILogger<ExceptionMiddleware> logger,
+            IHostEnvironment environment)
         {
             _next = next ?? throw new ArgumentNullException(nameof(next));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _environment = environment ?? throw new ArgumentNullException(nameof(environment));
         }
 
-        /// <summary>
-        /// Invokes the next middleware in the pipeline, catching any unhandled exceptions.
-        /// </summary>
-        /// <param name="context">The HTTP context for the current request.</param>
         public async Task InvokeAsync(HttpContext context)
         {
             try
@@ -52,10 +40,8 @@ namespace RoadDefectDetection.Middleware
             }
             catch (Exception ex)
             {
-                _logger.LogError(
-                    ex,
-                    "Unhandled exception caught by ExceptionMiddleware. " +
-                    "Method: {Method}, Path: {Path}, QueryString: {Query}",
+                _logger.LogError(ex,
+                    "Unhandled exception. Method={Method}, Path={Path}, Query={Query}",
                     context.Request.Method,
                     context.Request.Path,
                     context.Request.QueryString);
@@ -64,33 +50,27 @@ namespace RoadDefectDetection.Middleware
             }
         }
 
-        /// <summary>
-        /// Writes a standardized JSON error response to the client.
-        /// Always returns HTTP 500 Internal Server Error.
-        /// </summary>
-        /// <param name="context">The HTTP context.</param>
-        /// <param name="exception">The caught exception.</param>
-        private static async Task HandleExceptionAsync(HttpContext context, Exception exception)
+        private async Task HandleExceptionAsync(HttpContext context, Exception exception)
         {
-            // Prevent writing to an already-started response
-            if (context.Response.HasStarted)
-            {
-                return;
-            }
+            if (context.Response.HasStarted) return;
 
             context.Response.ContentType = "application/json";
             context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
 
-            var errorResponse = new
+            // Only expose the raw exception message in Development
+            string detail = _environment.IsDevelopment()
+                ? exception.Message
+                : "An internal error occurred. Please contact support if the issue persists.";
+
+            var body = new
             {
                 success = false,
                 message = "An error occurred while processing your request.",
-                error = exception.Message
+                error = detail
             };
 
-            string json = JsonSerializer.Serialize(errorResponse, JsonOptions);
-
-            await context.Response.WriteAsync(json);
+            await context.Response.WriteAsync(
+                JsonSerializer.Serialize(body, JsonOptions));
         }
     }
 }

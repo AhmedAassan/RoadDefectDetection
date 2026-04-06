@@ -3,14 +3,9 @@
 namespace RoadDefectDetection.Services
 {
     /// <summary>
-    /// IoU-based multi-frame object tracker with Exponential Moving Average (EMA)
-    /// smoothing to eliminate bounding box jitter between frames.
-    /// 
-    /// Improvements over basic tracker:
-    /// 1. EMA smoothing: box positions are smoothed over time
-    /// 2. Velocity estimation: predicts where a box will be in the next frame
-    /// 3. Better matching: uses predicted position for IoU computation
-    /// 4. Stable output: smoothed boxes don't jump between frames
+    /// IoU-based multi-frame object tracker with EMA smoothing and
+    /// velocity-based prediction. Preserves ModelId and ClassIndex
+    /// so that tracked detections remain mappable to external class IDs.
     /// </summary>
     public class SimpleTracker
     {
@@ -19,12 +14,6 @@ namespace RoadDefectDetection.Services
         private readonly float _iouThreshold;
         private readonly int _maxFramesLost;
 
-        /// <summary>
-        /// EMA smoothing factor (0 to 1).
-        /// Lower = smoother (more historical weight) but slower to react.
-        /// Higher = more responsive but more jittery.
-        /// 0.4 is a good balance for road defect detection.
-        /// </summary>
         private const float SmoothingAlpha = 0.4f;
 
         public IReadOnlyList<TrackedDefect> AllTracks => _allTracks;
@@ -38,8 +27,8 @@ namespace RoadDefectDetection.Services
         }
 
         /// <summary>
-        /// Processes detections from a single frame with EMA smoothing.
-        /// Returns matches with SMOOTHED bounding boxes (not raw detections).
+        /// Processes detections from one frame. Returns matched/new tracks
+        /// with SMOOTHED bounding boxes.
         /// </summary>
         public List<TrackMatch> Update(
             List<DetectionResult> detections,
@@ -50,11 +39,10 @@ namespace RoadDefectDetection.Services
 
             if (detections == null || detections.Count == 0)
             {
-                foreach (var track in _allTracks.Where(t => !t.IsLost))
+                foreach (var t in _allTracks.Where(t => !t.IsLost))
                 {
-                    track.FramesSinceLastSeen++;
-                    if (track.FramesSinceLastSeen > _maxFramesLost)
-                        track.IsLost = true;
+                    t.FramesSinceLastSeen++;
+                    if (t.FramesSinceLastSeen > _maxFramesLost) t.IsLost = true;
                 }
                 return matches;
             }
@@ -63,71 +51,58 @@ namespace RoadDefectDetection.Services
             var matchedDetIdx = new HashSet<int>();
             var matchedTrackIdx = new HashSet<int>();
 
-            // ── Step 1: Predict where each track should be ──────
-            // Use velocity to predict position (helps matching)
+            // Predict next positions
             foreach (var track in activeTracks)
-            {
                 track.PredictedBox = PredictNextPosition(track);
-            }
 
-            // ── Step 2: Build IoU matrix using PREDICTED positions ─
-            var iouPairs = new List<(int trackIdx, int detIdx, float iou)>();
-
-            for (int t = 0; t < activeTracks.Count; t++)
+            // Build IoU pairs (same class only)
+            var iouPairs = new List<(int ti, int di, float iou)>();
+            for (int ti = 0; ti < activeTracks.Count; ti++)
             {
-                for (int d = 0; d < detections.Count; d++)
+                for (int di = 0; di < detections.Count; di++)
                 {
-                    if (activeTracks[t].DefectClass != detections[d].Problem)
-                        continue;
-
-                    // Use predicted position for better matching
-                    BoundingBox trackBox = activeTracks[t].PredictedBox
-                        ?? activeTracks[t].SmoothedBox;
-
-                    float iou = ComputeIoU(trackBox, detections[d].Box);
-                    if (iou >= _iouThreshold)
-                    {
-                        iouPairs.Add((t, d, iou));
-                    }
+                    if (activeTracks[ti].DefectClass != detections[di].Problem) continue;
+                    var trackBox = activeTracks[ti].PredictedBox ?? activeTracks[ti].SmoothedBox;
+                    float iou = ComputeIoU(trackBox, detections[di].Box);
+                    if (iou >= _iouThreshold) iouPairs.Add((ti, di, iou));
                 }
             }
 
-            // ── Step 3: Greedy matching (highest IoU first) ─────
-            foreach (var pair in iouPairs.OrderByDescending(p => p.iou))
+            // Greedy matching
+            foreach (var (ti, di, _) in iouPairs.OrderByDescending(p => p.iou))
             {
-                if (matchedTrackIdx.Contains(pair.trackIdx) ||
-                    matchedDetIdx.Contains(pair.detIdx))
-                    continue;
+                if (matchedTrackIdx.Contains(ti) || matchedDetIdx.Contains(di)) continue;
 
-                var track = activeTracks[pair.trackIdx];
-                var detection = detections[pair.detIdx];
-
-                // ── Apply EMA smoothing to box coordinates ──────
+                var track = activeTracks[ti];
+                var detection = detections[di];
                 var rawBox = detection.Box;
-                var prevSmooth = track.SmoothedBox;
+                var prev = track.SmoothedBox;
 
-                var smoothedBox = new BoundingBox
+                var smoothed = new BoundingBox
                 {
-                    X = Lerp(prevSmooth.X, rawBox.X, SmoothingAlpha),
-                    Y = Lerp(prevSmooth.Y, rawBox.Y, SmoothingAlpha),
-                    Width = Lerp(prevSmooth.Width, rawBox.Width, SmoothingAlpha),
-                    Height = Lerp(prevSmooth.Height, rawBox.Height, SmoothingAlpha)
+                    X = Lerp(prev.X, rawBox.X, SmoothingAlpha),
+                    Y = Lerp(prev.Y, rawBox.Y, SmoothingAlpha),
+                    Width = Lerp(prev.Width, rawBox.Width, SmoothingAlpha),
+                    Height = Lerp(prev.Height, rawBox.Height, SmoothingAlpha)
                 };
 
-                // ── Update velocity estimate ────────────────────
-                track.VelocityX = rawBox.X - prevSmooth.X;
-                track.VelocityY = rawBox.Y - prevSmooth.Y;
-                track.VelocityW = rawBox.Width - prevSmooth.Width;
-                track.VelocityH = rawBox.Height - prevSmooth.Height;
+                track.VelocityX = rawBox.X - prev.X;
+                track.VelocityY = rawBox.Y - prev.Y;
+                track.VelocityW = rawBox.Width - prev.Width;
+                track.VelocityH = rawBox.Height - prev.Height;
 
-                // ── Update track state ──────────────────────────
-                track.SmoothedBox = smoothedBox;
+                track.SmoothedBox = smoothed;
                 track.RawBox = rawBox;
                 track.LastConfidence = detection.Confidence;
                 track.LastFrameNumber = frameNumber;
                 track.LastTimestamp = timestampSeconds;
                 track.FramesSinceLastSeen = 0;
                 track.TotalAppearances++;
+
+                // Preserve model identity for mapping
+                track.ModelId = detection.ModelId;
+                track.ClassIndex = detection.ClassIndex;
+                track.ModelSource = detection.ModelSource;
 
                 if (detection.Confidence > track.BestConfidence)
                 {
@@ -137,13 +112,14 @@ namespace RoadDefectDetection.Services
                     track.BestTimestamp = timestampSeconds;
                 }
 
-                // Return SMOOTHED detection (not raw)
                 var smoothedDetection = new DetectionResult
                 {
                     Problem = detection.Problem,
                     Confidence = detection.Confidence,
                     ModelSource = detection.ModelSource,
-                    Box = smoothedBox
+                    ModelId = detection.ModelId,
+                    ClassIndex = detection.ClassIndex,
+                    Box = smoothed
                 };
 
                 matches.Add(new TrackMatch
@@ -154,21 +130,22 @@ namespace RoadDefectDetection.Services
                     IsNewTrack = false
                 });
 
-                matchedTrackIdx.Add(pair.trackIdx);
-                matchedDetIdx.Add(pair.detIdx);
+                matchedTrackIdx.Add(ti);
+                matchedDetIdx.Add(di);
             }
 
-            // ── Step 4: New tracks for unmatched detections ─────
-            for (int d = 0; d < detections.Count; d++)
+            // New tracks for unmatched detections
+            for (int di = 0; di < detections.Count; di++)
             {
-                if (matchedDetIdx.Contains(d)) continue;
-
-                var det = detections[d];
+                if (matchedDetIdx.Contains(di)) continue;
+                var det = detections[di];
                 var newTrack = new TrackedDefect
                 {
                     TrackId = _nextTrackId++,
                     DefectClass = det.Problem,
                     ModelSource = det.ModelSource,
+                    ModelId = det.ModelId,
+                    ClassIndex = det.ClassIndex,
                     FirstFrameNumber = frameNumber,
                     FirstTimestamp = timestampSeconds,
                     LastFrameNumber = frameNumber,
@@ -182,15 +159,9 @@ namespace RoadDefectDetection.Services
                     BestTimestamp = timestampSeconds,
                     TotalAppearances = 1,
                     FramesSinceLastSeen = 0,
-                    IsLost = false,
-                    VelocityX = 0,
-                    VelocityY = 0,
-                    VelocityW = 0,
-                    VelocityH = 0
+                    IsLost = false
                 };
-
                 _allTracks.Add(newTrack);
-
                 matches.Add(new TrackMatch
                 {
                     TrackId = newTrack.TrackId,
@@ -200,43 +171,16 @@ namespace RoadDefectDetection.Services
                 });
             }
 
-            // ── Step 5: Age unmatched tracks ────────────────────
-            for (int t = 0; t < activeTracks.Count; t++)
+            // Age unmatched active tracks
+            for (int ti = 0; ti < activeTracks.Count; ti++)
             {
-                if (matchedTrackIdx.Contains(t)) continue;
-                activeTracks[t].FramesSinceLastSeen++;
-                if (activeTracks[t].FramesSinceLastSeen > _maxFramesLost)
-                    activeTracks[t].IsLost = true;
+                if (matchedTrackIdx.Contains(ti)) continue;
+                activeTracks[ti].FramesSinceLastSeen++;
+                if (activeTracks[ti].FramesSinceLastSeen > _maxFramesLost)
+                    activeTracks[ti].IsLost = true;
             }
 
             return matches;
-        }
-
-        /// <summary>
-        /// Predicts the next position of a track based on its velocity.
-        /// Simple linear prediction.
-        /// </summary>
-        private BoundingBox? PredictNextPosition(TrackedDefect track)
-        {
-            // Only predict if we have velocity data and track was recently seen
-            if (track.TotalAppearances < 2 || track.FramesSinceLastSeen > 2)
-                return null;
-
-            return new BoundingBox
-            {
-                X = track.SmoothedBox.X + track.VelocityX * 0.5f,
-                Y = track.SmoothedBox.Y + track.VelocityY * 0.5f,
-                Width = Math.Max(10, track.SmoothedBox.Width + track.VelocityW * 0.3f),
-                Height = Math.Max(10, track.SmoothedBox.Height + track.VelocityH * 0.3f)
-            };
-        }
-
-        /// <summary>
-        /// Linear interpolation (used for EMA smoothing).
-        /// </summary>
-        private static float Lerp(float previous, float current, float alpha)
-        {
-            return previous + alpha * (current - previous);
         }
 
         public List<UniqueDefectSummary> GetUniqueDefectSummary()
@@ -254,7 +198,9 @@ namespace RoadDefectDetection.Services
                 LastSeenFrame = t.LastFrameNumber,
                 LastSeenTimestamp = t.LastTimestamp,
                 TotalFrameAppearances = t.TotalAppearances,
-                ModelSource = t.ModelSource
+                ModelSource = t.ModelSource,
+                ModelId = t.ModelId,
+                ClassIndex = t.ClassIndex
             }).ToList();
         }
 
@@ -264,65 +210,67 @@ namespace RoadDefectDetection.Services
             _nextTrackId = 1;
         }
 
+        private static BoundingBox? PredictNextPosition(TrackedDefect track)
+        {
+            if (track.TotalAppearances < 2 || track.FramesSinceLastSeen > 2)
+                return null;
+            return new BoundingBox
+            {
+                X = track.SmoothedBox.X + track.VelocityX * 0.5f,
+                Y = track.SmoothedBox.Y + track.VelocityY * 0.5f,
+                Width = Math.Max(10, track.SmoothedBox.Width + track.VelocityW * 0.3f),
+                Height = Math.Max(10, track.SmoothedBox.Height + track.VelocityH * 0.3f)
+            };
+        }
+
+        private static float Lerp(float prev, float curr, float alpha) =>
+            prev + alpha * (curr - prev);
+
         private static float ComputeIoU(BoundingBox a, BoundingBox b)
         {
-            float x1 = Math.Max(a.X, b.X);
-            float y1 = Math.Max(a.Y, b.Y);
+            float x1 = Math.Max(a.X, b.X), y1 = Math.Max(a.Y, b.Y);
             float x2 = Math.Min(a.X + a.Width, b.X + b.Width);
             float y2 = Math.Min(a.Y + a.Height, b.Y + b.Height);
-
-            float iW = Math.Max(0, x2 - x1);
-            float iH = Math.Max(0, y2 - y1);
-            float iArea = iW * iH;
-
-            float aA = a.Width * a.Height;
-            float aB = b.Width * b.Height;
-            float uArea = aA + aB - iArea;
-
-            return uArea <= 0 ? 0f : iArea / uArea;
+            float iW = Math.Max(0, x2 - x1), iH = Math.Max(0, y2 - y1);
+            float inter = iW * iH;
+            float union = a.Width * a.Height + b.Width * b.Height - inter;
+            return union <= 0 ? 0f : inter / union;
         }
     }
 
-    /// <summary>
-    /// Tracked defect with smoothing state.
-    /// </summary>
+    // ── Supporting types ─────────────────────────────────────────
+
     public class TrackedDefect
     {
         public int TrackId { get; set; }
         public string DefectClass { get; set; } = string.Empty;
         public string ModelSource { get; set; } = string.Empty;
 
-        // First appearance
+        /// <summary>Preserved from the detection for external mapping.</summary>
+        public int ModelId { get; set; }
+        /// <summary>Preserved from the detection for external mapping.</summary>
+        public int ClassIndex { get; set; }
+
         public int FirstFrameNumber { get; set; }
         public double FirstTimestamp { get; set; }
-
-        // Last appearance
         public int LastFrameNumber { get; set; }
         public double LastTimestamp { get; set; }
         public float LastConfidence { get; set; }
 
-        // Smoothed box (EMA-filtered — use this for rendering)
         public BoundingBox SmoothedBox { get; set; } = new();
-
-        // Raw box (unfiltered — latest detection)
         public BoundingBox RawBox { get; set; } = new();
-
-        // Predicted position for next frame
         public BoundingBox? PredictedBox { get; set; }
 
-        // Velocity estimates (pixels per frame)
         public float VelocityX { get; set; }
         public float VelocityY { get; set; }
         public float VelocityW { get; set; }
         public float VelocityH { get; set; }
 
-        // Best detection
         public BoundingBox BestBox { get; set; } = new();
         public float BestConfidence { get; set; }
         public int BestFrameNumber { get; set; }
         public double BestTimestamp { get; set; }
 
-        // State
         public int TotalAppearances { get; set; }
         public int FramesSinceLastSeen { get; set; }
         public bool IsLost { get; set; }
@@ -331,9 +279,9 @@ namespace RoadDefectDetection.Services
     public class TrackMatch
     {
         public int TrackId { get; set; }
-        /// <summary>Smoothed detection (use for rendering)</summary>
+        /// <summary>Smoothed detection — use for rendering.</summary>
         public DetectionResult Detection { get; set; } = new();
-        /// <summary>Raw detection from model (unsmoothed)</summary>
+        /// <summary>Raw detection from model.</summary>
         public DetectionResult RawDetection { get; set; } = new();
         public bool IsNewTrack { get; set; }
     }
@@ -352,5 +300,9 @@ namespace RoadDefectDetection.Services
         public double LastSeenTimestamp { get; set; }
         public int TotalFrameAppearances { get; set; }
         public string ModelSource { get; set; } = string.Empty;
+        /// <summary>Preserved for external mapping of video results.</summary>
+        public int ModelId { get; set; }
+        /// <summary>Preserved for external mapping of video results.</summary>
+        public int ClassIndex { get; set; }
     }
 }

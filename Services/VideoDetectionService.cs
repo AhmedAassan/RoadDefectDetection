@@ -1,23 +1,30 @@
-﻿using System.Diagnostics;
-using System.Globalization;
-using System.Text.RegularExpressions;
+﻿using Microsoft.Extensions.Options;
+using OpenCvSharp;
 using RoadDefectDetection.Configuration;
 using RoadDefectDetection.DTOs;
 using RoadDefectDetection.Services.Interfaces;
+using System;
+using System.Diagnostics;
 
 namespace RoadDefectDetection.Services
 {
+    /// <summary>
+    /// Video-based road defect detection service.
+    /// 
+    /// Uses OpenCvSharp4 for all video operations:
+    ///   - Metadata probing   → VideoCapture properties
+    ///   - Frame extraction   → VideoCapture.Read() in-memory loop
+    ///   - Annotation drawing → OpenCvVideoAnnotator (Cv2.Rectangle / Cv2.PutText)
+    ///   - Output encoding    → VideoWriter (MP4V / XVID)
+    /// 
+    /// No external processes (FFmpeg) are spawned at any point.
+    /// </summary>
     public sealed class VideoDetectionService : IVideoDetectionService
     {
         private readonly IDetectionService _detectionService;
         private readonly ILogger<VideoDetectionService> _logger;
-        private readonly DetectionSettings _settings;
+        private readonly VideoProcessingSettings _videoSettings;
         private readonly AnnotatedVideoCache _videoCache;
-        private readonly string _ffmpegPath;
-        private readonly string _ffprobePath;
-
-        private const float TrackerIouThreshold = 0.25f;
-        private const int TrackerMaxFramesLost = 5;
 
         public string[] SupportedExtensions => new[]
         {
@@ -27,7 +34,7 @@ namespace RoadDefectDetection.Services
 
         public VideoDetectionService(
             IDetectionService detectionService,
-            IConfiguration configuration,
+            IOptions<VideoProcessingSettings> videoOptions,
             ILogger<VideoDetectionService> logger,
             AnnotatedVideoCache videoCache)
         {
@@ -37,202 +44,232 @@ namespace RoadDefectDetection.Services
                 ?? throw new ArgumentNullException(nameof(logger));
             _videoCache = videoCache
                 ?? throw new ArgumentNullException(nameof(videoCache));
-
-            _settings = new DetectionSettings();
-            configuration.GetSection("DetectionSettings").Bind(_settings);
-
-            var configPath = configuration.GetValue<string>("FFmpeg:Path") ?? "";
-
-            if (!string.IsNullOrEmpty(configPath))
-            {
-                _ffmpegPath = Path.Combine(configPath, "ffmpeg");
-                _ffprobePath = Path.Combine(configPath, "ffprobe");
-
-                if (OperatingSystem.IsWindows())
-                {
-                    if (!_ffmpegPath.EndsWith(".exe")) _ffmpegPath += ".exe";
-                    if (!_ffprobePath.EndsWith(".exe")) _ffprobePath += ".exe";
-                }
-            }
-            else
-            {
-                _ffmpegPath = "ffmpeg";
-                _ffprobePath = "ffprobe";
-            }
+            _videoSettings = videoOptions?.Value
+                ?? throw new ArgumentNullException(nameof(videoOptions));
         }
 
-        public async Task<bool> IsAvailableAsync()
+        /// <inheritdoc />
+        public bool IsAvailable()
         {
+            // Validate that the OpenCV native library is present and functional
+            // by opening and immediately releasing a VideoCapture.
             try
             {
-                return await TestExeAsync(_ffmpegPath, "-version")
-                    && await TestExeAsync(_ffprobePath, "-version");
+                using var cap = new VideoCapture();
+                // If the native library loaded successfully, IsOpened returns false
+                // for an empty capture — but no exception means OpenCV works.
+                _ = cap.IsOpened();
+                return true;
             }
-            catch { return false; }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "OpenCV native library is not available.");
+                return false;
+            }
         }
 
+        /// <inheritdoc />
         public async Task<VideoDetectionResponse> DetectVideoAsync(
             byte[] videoBytes,
             string videoName,
             VideoDetectionRequest request,
-            Action<int, int>? progress = null)
+            Action<int, int>? progress = null,
+            CancellationToken cancellationToken = default)
         {
             var sw = Stopwatch.StartNew();
 
-            string tempDir = Path.Combine(Path.GetTempPath(),
+            // Write video bytes to a single temp file (OpenCV needs a path)
+            string tempDir = Path.Combine(
+                Path.GetTempPath(),
                 "RoadDefect_" + Guid.NewGuid().ToString("N")[..8]);
             Directory.CreateDirectory(tempDir);
 
-            string videoPath = Path.Combine(tempDir,
-                "input" + Path.GetExtension(videoName).ToLowerInvariant());
-            string framesDir = Path.Combine(tempDir, "frames");
+            string videoExt = Path.GetExtension(videoName).ToLowerInvariant();
+            string videoPath = Path.Combine(tempDir, "input" + videoExt);
             string outputPath = Path.Combine(tempDir, "annotated.mp4");
-            Directory.CreateDirectory(framesDir);
 
             try
             {
                 _logger.LogInformation(
-                    "Video: '{N}' ({S:F1}MB) interval={I} max={M}",
+                    "Video: '{N}' ({S:F1}MB), interval={I}, maxFrames={M}",
                     videoName, videoBytes.Length / (1024.0 * 1024.0),
                     request.FrameInterval, request.MaxFrames);
 
-                await File.WriteAllBytesAsync(videoPath, videoBytes);
+                await File.WriteAllBytesAsync(videoPath, videoBytes, cancellationToken);
 
-                // ── Probe ────────────────────────────────────────
-                var meta = await ProbeAsync(videoPath);
+                // ── 1. Probe metadata ────────────────────────────
+                var meta = ProbeVideo(videoPath);
                 if (meta == null)
-                    return ErrorResponse("Failed to read video metadata.",
-                        videoName, sw);
+                    return ErrorResponse("Failed to read video metadata with OpenCV.", videoName, sw);
 
                 double fps = meta.Value.Fps;
-                double dur = meta.Value.Dur;
-                int w = meta.Value.W, h = meta.Value.H;
-                long totalFrames = (long)(fps * dur);
+                double dur = meta.Value.DurationSeconds;
+                int width = meta.Value.Width;
+                int height = meta.Value.Height;
+                long totalFrm = meta.Value.TotalFrames;
 
-                // ── Extraction rate ──────────────────────────────
+                _logger.LogInformation(
+                    "Video metadata: {W}x{H}, {Fps:F2}fps, {Dur:F1}s, {Total} frames",
+                    width, height, fps, dur, totalFrm);
+
+                // ── 2. Validate request parameters ───────────────
                 int interval = Math.Max(1, request.FrameInterval);
                 int maxFrames = Math.Max(1, request.MaxFrames);
-                double extractFps = fps / interval;
-                if (extractFps * dur > maxFrames)
-                    extractFps = maxFrames / dur;
-                extractFps = Math.Max(0.1, extractFps);
 
-                // ── Extract ──────────────────────────────────────
-                await ExtractAsync(videoPath, framesDir, extractFps);
-
-                var files = Directory.GetFiles(framesDir, "*.jpg")
-                    .OrderBy(f => f).Take(maxFrames).ToList();
-
-                if (files.Count == 0)
-                    return ErrorResponse("No frames extracted.", videoName, sw);
-
-                _logger.LogInformation("Extracted {C} frames. Detecting...",
-                    files.Count);
-
-                // ── Detect + Track ───────────────────────────────
-                var tracker = new SimpleTracker(TrackerIouThreshold, TrackerMaxFramesLost);
+                // ── 3. Extract & detect frames in-memory ─────────
+                var tracker = new SimpleTracker(
+                    _videoSettings.TrackerIouThreshold,
+                    _videoSettings.TrackerMaxFramesLost);
                 var frameResults = new List<FrameDetectionResult>();
-                // For video annotation, we store SMOOTHED detections
                 var smoothedFrameResults = new List<FrameDetectionResult>();
-                int processed = 0, totalRaw = 0;
 
-                foreach (var file in files)
+                int totalRaw = 0;
+                int processed = 0;
+
+                using (var capture = new VideoCapture(videoPath))
                 {
-                    try
+                    if (!capture.IsOpened())
+                        return ErrorResponse(
+                            "OpenCV could not open the video file. " +
+                            "Check that the file is a valid video format.",
+                            videoName, sw);
+
+                    using var mat = new Mat();
+                    long sourceFrameIdx = 0;
+                    int analyzedIdx = 0;
+
+                    while (!cancellationToken.IsCancellationRequested &&
+                           capture.Read(mat) && !mat.Empty())
                     {
-                        int idx = ParseFrameIndex(file);
-                        int actualFrame = (int)(idx * interval);
-                        double ts = extractFps > 0 ? idx / extractFps : 0;
-
-                        byte[] frameBytes = await File.ReadAllBytesAsync(file);
-
-                        var result = await _detectionService.DetectAsync(
-                            frameBytes,
-                            $"{videoName}_f{idx}",
-                            request.Confidence);
-
-                        totalRaw += result.TotalProblemsFound;
-
-                        // Track with smoothing
-                        var matches = tracker.Update(
-                            result.Detections, actualFrame, ts);
-
-                        var trackIds = matches.Select(m => m.TrackId).ToList();
-
-                        // Raw frame result (for JSON response)
-                        frameResults.Add(new FrameDetectionResult
+                        // Only analyze every Nth frame
+                        if (sourceFrameIdx % interval != 0)
                         {
-                            FrameNumber = actualFrame,
-                            TimestampSeconds = Math.Round(ts, 3),
-                            Timestamp = FormatTs(ts),
-                            DefectsInFrame = result.TotalProblemsFound,
-                            Detections = result.Detections,
-                            TrackIds = trackIds
-                        });
+                            sourceFrameIdx++;
+                            continue;
+                        }
 
-                        // SMOOTHED frame result (for video annotation)
-                        var smoothedDets = matches.Select(m => m.Detection).ToList();
-                        smoothedFrameResults.Add(new FrameDetectionResult
+                        if (analyzedIdx >= maxFrames) break;
+
+                        double timestampSec = fps > 0
+                            ? sourceFrameIdx / fps
+                            : analyzedIdx * (interval / 30.0);
+
+                        try
                         {
-                            FrameNumber = actualFrame,
-                            TimestampSeconds = Math.Round(ts, 3),
-                            Timestamp = FormatTs(ts),
-                            DefectsInFrame = smoothedDets.Count,
-                            Detections = smoothedDets,
-                            TrackIds = trackIds
-                        });
+                            // Encode frame as JPEG bytes for the image detection pipeline
+                            byte[] frameBytes = EncodeFrameAsJpeg(mat);
 
-                        processed++;
-                        progress?.Invoke(processed, files.Count);
+                            var result = await _detectionService.DetectAsync(
+                                frameBytes,
+                                $"{videoName}_f{sourceFrameIdx}",
+                                request.Confidence,
+                                cancellationToken);
 
-                        if (processed % 10 == 0)
-                            _logger.LogInformation("Processed {C}/{T}...",
-                                processed, files.Count);
+                            totalRaw += result.TotalProblemsFound;
+
+                            int actualFrame = (int)sourceFrameIdx;
+                            var matches = tracker.Update(
+                                result.Detections, actualFrame, timestampSec);
+
+                            var trackIds = matches.Select(m => m.TrackId).ToList();
+                            var smoothedDets = matches.Select(m => m.Detection).ToList();
+
+                            // Raw frame result (for JSON response)
+                            frameResults.Add(new FrameDetectionResult
+                            {
+                                FrameNumber = actualFrame,
+                                TimestampSeconds = Math.Round(timestampSec, 3),
+                                Timestamp = FormatTimestamp(timestampSec),
+                                DefectsInFrame = result.TotalProblemsFound,
+                                Detections = result.Detections,
+                                TrackIds = trackIds
+                            });
+
+                            // Smoothed frame result (for annotation)
+                            smoothedFrameResults.Add(new FrameDetectionResult
+                            {
+                                FrameNumber = actualFrame,
+                                TimestampSeconds = Math.Round(timestampSec, 3),
+                                Timestamp = FormatTimestamp(timestampSec),
+                                DefectsInFrame = smoothedDets.Count,
+                                Detections = smoothedDets,
+                                TrackIds = trackIds
+                            });
+
+                            processed++;
+                            analyzedIdx++;
+                            progress?.Invoke(processed, maxFrames);
+
+                            if (processed % 10 == 0)
+                                _logger.LogInformation(
+                                    "Processed {C} frames (sourceFrame={SF})...",
+                                    processed, sourceFrameIdx);
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            throw;
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex,
+                                "Frame {F} failed, skipping.", sourceFrameIdx);
+                        }
+
+                        sourceFrameIdx++;
                     }
-                    catch (Exception ex)
-                    {
-                        _logger.LogWarning(ex, "Frame failed: {F}", file);
-                    }
-                }
+                } // VideoCapture released here
 
-                // ── Annotated video (uses SMOOTHED boxes) ────────
-                string? videoId = null, videoUrl = null;
+                if (processed == 0)
+                    return ErrorResponse(
+                        "No frames could be extracted from the video.", videoName, sw);
+
+                // ── 4. Annotated video generation ────────────────
+                string? videoId = null;
+                string? videoUrl = null;
+
                 try
                 {
-                    var annotator = new VideoAnnotator(_ffmpegPath, _logger);
-
-                    // Pass smoothedFrameResults to annotator
-                    bool ok = await annotator.CreateAnnotatedVideoAsync(
-                        videoPath, outputPath,
-                        smoothedFrameResults,
-                        fps, interval);
+                    var annotator = new OpenCvVideoAnnotator(_logger);
+                    bool ok = await Task.Run(() =>
+                        annotator.CreateAnnotatedVideo(
+                            videoPath, outputPath,
+                            smoothedFrameResults,
+                            cancellationToken),
+                        cancellationToken);
 
                     if (ok && File.Exists(outputPath))
                     {
-                        var outBytes = await File.ReadAllBytesAsync(outputPath);
+                        var outBytes = await File.ReadAllBytesAsync(outputPath, cancellationToken);
                         if (outBytes.Length > 0)
                         {
                             videoId = _videoCache.Store(outBytes, videoName);
                             videoUrl = $"/api/videodetection/annotated/{videoId}";
-                            _logger.LogInformation("Cached: {Id} ({S:F1}MB)",
+                            _logger.LogInformation(
+                                "Annotated video cached: '{Id}' ({S:F1}MB)",
                                 videoId, outBytes.Length / (1024.0 * 1024.0));
                         }
                     }
                 }
+                catch (OperationCanceledException)
+                {
+                    _logger.LogInformation("Annotation cancelled.");
+                }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Annotation failed.");
+                    _logger.LogWarning(ex,
+                        "Annotation failed — continuing without annotated video.");
                 }
 
+                // ── 5. Build response ────────────────────────────
                 sw.Stop();
-
-                // ── Response ─────────────────────────────────────
                 var unique = tracker.GetUniqueDefectSummary();
-                var rawSum = frameResults.SelectMany(f => f.Detections)
-                    .GroupBy(d => d.Problem).ToDictionary(g => g.Key, g => g.Count());
-                var uniSum = unique.GroupBy(d => d.DefectClass)
+                var rawSum = frameResults
+                    .SelectMany(f => f.Detections)
+                    .GroupBy(d => d.Problem)
                     .ToDictionary(g => g.Key, g => g.Count());
-
+                var uniSum = unique
+                    .GroupBy(d => d.DefectClass)
+                    .ToDictionary(g => g.Key, g => g.Count());
                 int withDef = frameResults.Count(f => f.DefectsInFrame > 0);
                 double ms = sw.Elapsed.TotalMilliseconds;
 
@@ -240,17 +277,17 @@ namespace RoadDefectDetection.Services
                 {
                     Success = true,
                     Message = unique.Count > 0
-                        ? $"Found {unique.Count} unique defect(s) ({totalRaw} raw " +
+                        ? $"Found {unique.Count} unique defect(s) ({totalRaw} raw detections " +
                           $"across {withDef} of {processed} frames). " +
-                          $"Tracking eliminated {totalRaw - unique.Count} duplicate(s)."
-                        : $"No defects in {processed} frames.",
+                          $"Tracking eliminated {Math.Max(0, totalRaw - unique.Count)} duplicate(s)."
+                        : $"No defects detected across {processed} analyzed frames.",
                     VideoName = videoName,
                     VideoDurationSeconds = Math.Round(dur, 2),
-                    VideoDuration = FormatTs(dur),
+                    VideoDuration = FormatTimestamp(dur),
                     VideoFps = Math.Round(fps, 2),
-                    VideoWidth = w,
-                    VideoHeight = h,
-                    TotalFrameCount = totalFrames,
+                    VideoWidth = width,
+                    VideoHeight = height,
+                    TotalFrameCount = totalFrm,
                     FramesAnalyzed = processed,
                     FrameIntervalUsed = interval,
                     ProcessingTimeMs = Math.Round(ms, 1),
@@ -261,21 +298,109 @@ namespace RoadDefectDetection.Services
                     DefectSummary = uniSum,
                     RawDefectSummary = rawSum,
                     UniqueDefects = unique,
-                    FrameResults = frameResults, // Raw for JSON
+                    FrameResults = frameResults,
                     AnnotatedVideoId = videoId,
                     AnnotatedVideoUrl = videoUrl
                 };
             }
+            catch (OperationCanceledException)
+            {
+                sw.Stop();
+                _logger.LogInformation("Video detection cancelled for '{V}'.", videoName);
+                return ErrorResponse("Video detection was cancelled.", videoName, sw);
+            }
             catch (Exception ex)
             {
                 sw.Stop();
-                _logger.LogError(ex, "Error: '{V}'", videoName);
-                return ErrorResponse($"Failed: {ex.Message}", videoName, sw);
+                _logger.LogError(ex, "Error processing video '{V}'.", videoName);
+                return ErrorResponse("Video processing failed. See server logs.", videoName, sw);
             }
             finally
             {
                 Cleanup(tempDir);
             }
+        }
+
+        // ── Helpers ──────────────────────────────────────────────
+
+        /// <summary>
+        /// Probes video metadata using OpenCV VideoCapture properties.
+        /// No external process required.
+        /// </summary>
+        private VideoMeta? ProbeVideo(string path)
+        {
+            try
+            {
+                using var cap = new VideoCapture(path);
+                if (!cap.IsOpened())
+                {
+                    _logger.LogWarning("OpenCV could not open '{Path}' for probing.", path);
+                    return null;
+                }
+
+                double fps = cap.Get(VideoCaptureProperties.Fps);
+                int width = (int)cap.Get(VideoCaptureProperties.FrameWidth);
+                int height = (int)cap.Get(VideoCaptureProperties.FrameHeight);
+                long count = (long)cap.Get(VideoCaptureProperties.FrameCount);
+
+                // Some codecs/containers don't report frame count reliably
+                if (fps <= 0) fps = 25;
+
+                double duration = count > 0 && fps > 0
+                    ? count / fps
+                    : EstimateDuration(cap, fps);
+
+                if (width <= 0 || height <= 0)
+                {
+                    _logger.LogWarning(
+                        "Invalid dimensions from OpenCV probe: {W}x{H}", width, height);
+                    return null;
+                }
+
+                return new VideoMeta
+                {
+                    Fps = fps,
+                    Width = width,
+                    Height = height,
+                    TotalFrames = count > 0 ? count : (long)(duration * fps),
+                    DurationSeconds = duration
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "ProbeVideo failed for '{Path}'.", path);
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Estimates video duration by seeking to the end when frame count
+        /// is not available from container metadata.
+        /// </summary>
+        private static double EstimateDuration(VideoCapture cap, double fps)
+        {
+            // Try position-in-milliseconds at the end
+            try
+            {
+                cap.Set(VideoCaptureProperties.PosMsec, double.MaxValue);
+                double endMs = cap.Get(VideoCaptureProperties.PosMsec);
+                cap.Set(VideoCaptureProperties.PosMsec, 0); // rewind
+                if (endMs > 0) return endMs / 1000.0;
+            }
+            catch { /* ignore */ }
+
+            return 0;
+        }
+
+        /// <summary>
+        /// Encodes an OpenCV Mat frame as JPEG bytes compatible with the
+        /// image detection pipeline (SixLabors.ImageSharp).
+        /// </summary>
+        private static byte[] EncodeFrameAsJpeg(Mat frame)
+        {
+            Cv2.ImEncode(".jpg", frame, out var buffer,
+                new ImageEncodingParam(ImwriteFlags.JpegQuality, 90));
+            return buffer;
         }
 
         private static VideoDetectionResponse ErrorResponse(
@@ -290,162 +415,34 @@ namespace RoadDefectDetection.Services
             };
         }
 
-        // ═════════════════════════════════════════════════════════
-        // PROBE / EXTRACT / HELPERS
-        // ═════════════════════════════════════════════════════════
-
-        private async Task<VMeta?> ProbeAsync(string path)
+        private static string FormatTimestamp(double seconds)
         {
-            try
-            {
-                string args = $"-v error -select_streams v:0 " +
-                    $"-show_entries stream=width,height,r_frame_rate,duration " +
-                    $"-show_entries format=duration -of csv=p=0:s=, \"{path}\"";
-                string output = await RunAsync(_ffprobePath, args);
-
-                var lines = output.Split('\n', StringSplitOptions.RemoveEmptyEntries)
-                    .Select(l => l.Trim()).Where(l => l.Length > 0).ToList();
-
-                int pw = 0, ph = 0; double pf = 30, pd = 0;
-                foreach (var line in lines)
-                {
-                    var p = line.Split(',');
-                    if (p.Length >= 3)
-                    {
-                        if (int.TryParse(p[0].Trim(), out int vw) && vw > 0) pw = vw;
-                        if (p.Length > 1 && int.TryParse(p[1].Trim(), out int vh) && vh > 0) ph = vh;
-                        if (p.Length > 2) pf = ParseFps(p[2].Trim());
-                        if (p.Length > 3 && double.TryParse(p[3].Trim(),
-                            NumberStyles.Float, CultureInfo.InvariantCulture, out double sd)) pd = sd;
-                    }
-                    else if (p.Length == 1 && double.TryParse(p[0].Trim(),
-                        NumberStyles.Float, CultureInfo.InvariantCulture, out double fd) && fd > 0)
-                    { if (pd <= 0) pd = fd; }
-                }
-
-                if (pd <= 0)
-                {
-                    string dOut = await RunAsync(_ffprobePath,
-                        $"-v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 \"{path}\"");
-                    double.TryParse(dOut.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out pd);
-                }
-
-                if (pw <= 0 || ph <= 0 || pd <= 0)
-                    return await SimpleProbeAsync(path);
-
-                return new VMeta { W = pw, H = ph, Fps = pf, Dur = pd };
-            }
-            catch { return await SimpleProbeAsync(path); }
-        }
-
-        private async Task<VMeta?> SimpleProbeAsync(string path)
-        {
-            try
-            {
-                string dO = await RunAsync(_ffprobePath,
-                    $"-v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 \"{path}\"");
-                double.TryParse(dO.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out double dur);
-
-                string rO = await RunAsync(_ffprobePath,
-                    $"-v error -select_streams v:0 -show_entries stream=width,height -of csv=s=x:p=0 \"{path}\"");
-                var rp = rO.Trim().Split('x');
-                int w = 0, h = 0;
-                if (rp.Length >= 2) { int.TryParse(rp[0], out w); int.TryParse(rp[1], out h); }
-
-                string fO = await RunAsync(_ffprobePath,
-                    $"-v error -select_streams v:0 -show_entries stream=r_frame_rate -of default=noprint_wrappers=1:nokey=1 \"{path}\"");
-                double fp = ParseFps(fO.Trim());
-
-                if (dur <= 0 || w <= 0 || h <= 0) return null;
-                return new VMeta { W = w, H = h, Fps = fp > 0 ? fp : 30, Dur = dur };
-            }
-            catch { return null; }
-        }
-
-        private async Task ExtractAsync(string video, string outDir, double fps)
-        {
-            string pat = Path.Combine(outDir, "frame_%05d.jpg");
-            string fs = fps.ToString("F4", CultureInfo.InvariantCulture);
-            await RunAsync(_ffmpegPath,
-                $"-i \"{video}\" -vf \"fps={fs}\" -q:v 2 -vsync vfr \"{pat}\"", 300);
-        }
-
-        private async Task<string> RunAsync(string exe, string args, int timeout = 60)
-        {
-            var psi = new ProcessStartInfo
-            {
-                FileName = exe,
-                Arguments = args,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-            using var p = new Process { StartInfo = psi };
-            p.Start();
-            var so = p.StandardOutput.ReadToEndAsync();
-            var se = p.StandardError.ReadToEndAsync();
-            bool ok = await Task.Run(() => p.WaitForExit(timeout * 1000));
-            if (!ok) { try { p.Kill(true); } catch { } throw new TimeoutException(); }
-            string stdout = await so, stderr = await se;
-            return !string.IsNullOrEmpty(stdout) ? stdout : stderr;
-        }
-
-        private async Task<bool> TestExeAsync(string exe, string args)
-        {
-            try
-            {
-                var psi = new ProcessStartInfo
-                {
-                    FileName = exe,
-                    Arguments = args,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                };
-                using var p = Process.Start(psi);
-                if (p == null) return false;
-                bool ok = await Task.Run(() => p.WaitForExit(5000));
-                if (!ok) { try { p.Kill(); } catch { } return false; }
-                return p.ExitCode == 0;
-            }
-            catch { return false; }
-        }
-
-        private static double ParseFps(string s)
-        {
-            if (string.IsNullOrWhiteSpace(s)) return 30;
-            s = s.Trim();
-            if (s.Contains('/'))
-            {
-                var p = s.Split('/');
-                if (p.Length == 2 &&
-                    double.TryParse(p[0], NumberStyles.Float, CultureInfo.InvariantCulture, out double n) &&
-                    double.TryParse(p[1], NumberStyles.Float, CultureInfo.InvariantCulture, out double d) && d > 0)
-                    return n / d;
-            }
-            return double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out double f) && f > 0 ? f : 30;
-        }
-
-        private static int ParseFrameIndex(string path)
-        {
-            var m = Regex.Match(Path.GetFileNameWithoutExtension(path), @"(\d+)");
-            return m.Success && int.TryParse(m.Groups[1].Value, out int i) ? Math.Max(0, i - 1) : 0;
-        }
-
-        private static string FormatTs(double s)
-        {
-            var ts = TimeSpan.FromSeconds(s);
-            return ts.TotalHours >= 1 ? ts.ToString(@"hh\:mm\:ss\.f") : ts.ToString(@"mm\:ss\.f");
+            var ts = TimeSpan.FromSeconds(seconds);
+            return ts.TotalHours >= 1
+                ? ts.ToString(@"hh\:mm\:ss\.f")
+                : ts.ToString(@"mm\:ss\.f");
         }
 
         private void Cleanup(string dir)
         {
-            try { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
-            catch (Exception ex) { _logger.LogWarning(ex, "Cleanup: {D}", dir); }
+            try
+            {
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to clean up temp dir: {Dir}", dir);
+            }
         }
 
-        private struct VMeta { public int W, H; public double Fps, Dur; }
+        private struct VideoMeta
+        {
+            public int Width;
+            public int Height;
+            public double Fps;
+            public double DurationSeconds;
+            public long TotalFrames;
+        }
     }
 }

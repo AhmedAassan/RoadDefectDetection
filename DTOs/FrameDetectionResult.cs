@@ -2,7 +2,6 @@
 {
     /// <summary>
     /// Detection results for a single video frame.
-    /// Now includes track IDs for each detection.
     /// </summary>
     public class FrameDetectionResult
     {
@@ -15,7 +14,6 @@
         /// <summary>
         /// Track IDs for each detection in this frame.
         /// Index matches the Detections list.
-        /// Allows the UI to color-code or label tracked defects.
         /// </summary>
         public List<int> TrackIds { get; set; } = new();
     }

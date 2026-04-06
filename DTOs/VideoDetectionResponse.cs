@@ -30,16 +30,7 @@ namespace RoadDefectDetection.DTOs
         public Dictionary<string, int> RawDefectSummary { get; set; } = new();
 
         // ── Annotated Video ─────────────────────────────────────
-        /// <summary>
-        /// Unique ID to retrieve the annotated video via 
-        /// /api/videodetection/annotated/{id}
-        /// Only populated when annotated video generation succeeds.
-        /// </summary>
         public string? AnnotatedVideoId { get; set; }
-
-        /// <summary>
-        /// URL path to download/stream the annotated video.
-        /// </summary>
         public string? AnnotatedVideoUrl { get; set; }
 
         // ── Tracking Results ────────────────────────────────────
@@ -47,11 +38,5 @@ namespace RoadDefectDetection.DTOs
 
         // ── Per-Frame Results ───────────────────────────────────
         public List<FrameDetectionResult> FrameResults { get; set; } = new();
-
-        public int TotalDefectsFound
-        {
-            get => TotalUniqueDefects;
-            set => TotalUniqueDefects = value;
-        }
     }
 }

@@ -1,6 +1,5 @@
 ﻿using System.Diagnostics;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using RoadDefectDetection.Configuration;
 using RoadDefectDetection.DTOs;
 using RoadDefectDetection.Services.Interfaces;
@@ -9,14 +8,7 @@ namespace RoadDefectDetection.Services
 {
     /// <summary>
     /// Orchestrates road defect detection across all loaded ONNX models.
-    /// 
-    /// At startup, reads model configurations from appsettings.json, loads each
-    /// enabled ONNX model into a <see cref="YoloDetector"/> instance, and holds
-    /// them for the lifetime of the application. When a detection request arrives,
-    /// all models run in parallel against the same image, and results are merged.
-    /// 
-    /// Now passes ModelId to each YoloDetector so detections carry the model
-    /// identifier needed for external system mapping.
+    /// Models are loaded once at startup and reused for the application lifetime.
     /// </summary>
     public sealed class RoadDetectionService : IDetectionService, IDisposable
     {
@@ -25,26 +17,22 @@ namespace RoadDefectDetection.Services
         private readonly DetectionSettings _settings;
         private bool _disposed;
 
-        public RoadDetectionService(IConfiguration configuration, ILogger<RoadDetectionService> logger)
+        public RoadDetectionService(
+            IConfiguration configuration,
+            IOptions<DetectionSettings> settings,
+            ILogger<RoadDetectionService> logger)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-
-            // ------------------------------------------------------------------
-            // 1. Bind global detection settings
-            // ------------------------------------------------------------------
-            _settings = new DetectionSettings();
-            configuration.GetSection("DetectionSettings").Bind(_settings);
+            _settings = settings?.Value ?? throw new ArgumentNullException(nameof(settings));
 
             _logger.LogInformation(
-                "Detection settings loaded — DefaultConfidence: {Confidence}, IoU: {IoU}, InputSize: {Size}, MaxImageSize: {Max}MB.",
+                "Detection settings — Confidence: {C}, IoU: {I}, InputSize: {S}, MaxImageMB: {M}, MaxConcurrent: {P}",
                 _settings.DefaultConfidenceThreshold,
                 _settings.IouThreshold,
                 _settings.InputSize,
-                _settings.MaxImageSizeMB);
+                _settings.MaxImageSizeMB,
+                _settings.MaxConcurrentDetections);
 
-            // ------------------------------------------------------------------
-            // 2. Bind model configurations
-            // ------------------------------------------------------------------
             var modelConfigs = new List<ModelConfig>();
             configuration.GetSection("Models").Bind(modelConfigs);
 
@@ -56,9 +44,7 @@ namespace RoadDefectDetection.Services
 
             _logger.LogInformation("Found {Count} model configuration(s). Loading enabled models...", modelConfigs.Count);
 
-            // ------------------------------------------------------------------
-            // 3. Validate ModelId uniqueness
-            // ------------------------------------------------------------------
+            // Validate ModelId uniqueness
             var duplicateIds = modelConfigs
                 .Where(m => m.Enabled)
                 .GroupBy(m => m.ModelId)
@@ -67,17 +53,10 @@ namespace RoadDefectDetection.Services
                 .ToList();
 
             if (duplicateIds.Count > 0)
-            {
-                _logger.LogError(
-                    "Duplicate ModelId(s) found: [{Ids}]. Each model must have a unique ModelId.",
+                _logger.LogError("Duplicate ModelId(s) found: [{Ids}]. Each model must have a unique ModelId.",
                     string.Join(", ", duplicateIds));
-            }
 
-            // ------------------------------------------------------------------
-            // 4. Load each enabled model
-            // ------------------------------------------------------------------
             string modelsDirectory = Path.Combine(Directory.GetCurrentDirectory(), "Models");
-
             if (!Directory.Exists(modelsDirectory))
             {
                 _logger.LogWarning("Models directory not found at '{Path}'. Creating it.", modelsDirectory);
@@ -88,18 +67,15 @@ namespace RoadDefectDetection.Services
             {
                 if (!config.Enabled)
                 {
-                    _logger.LogInformation("Model '{ModelName}' (ID: {ModelId}) is disabled. Skipping.",
-                        config.Name, config.ModelId);
+                    _logger.LogInformation("Model '{Name}' (ID: {Id}) is disabled. Skipping.", config.Name, config.ModelId);
                     continue;
                 }
 
                 string modelPath = Path.Combine(modelsDirectory, config.FileName);
-
                 if (!File.Exists(modelPath))
                 {
                     _logger.LogWarning(
-                        "Model file not found: '{ModelPath}'. Skipping model '{ModelName}' (ID: {ModelId}). " +
-                        "Place the .onnx file in the Models folder and restart.",
+                        "Model file not found: '{Path}'. Skipping model '{Name}' (ID: {Id}).",
                         modelPath, config.Name, config.ModelId);
                     continue;
                 }
@@ -122,34 +98,31 @@ namespace RoadDefectDetection.Services
                     _detectors.Add(detector);
 
                     _logger.LogInformation(
-                        "Successfully loaded model '{ModelName}' (ID: {ModelId}, File: {FileName}) " +
-                        "with {ClassCount} classes: [{Classes}].",
-                        config.Name,
-                        config.ModelId,
-                        config.FileName,
-                        config.Classes.Length,
-                        string.Join(", ", config.Classes));
+                        "Loaded model '{Name}' (ID: {Id}, File: {File}) with {Count} classes: [{Classes}].",
+                        config.Name, config.ModelId, config.FileName,
+                        config.Classes.Length, string.Join(", ", config.Classes));
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(
-                        ex,
-                        "Failed to load model '{ModelName}' (ID: {ModelId}) from '{FileName}'. " +
-                        "This model will be unavailable.",
+                    _logger.LogError(ex,
+                        "Failed to load model '{Name}' (ID: {Id}) from '{File}'.",
                         config.Name, config.ModelId, config.FileName);
                 }
             }
 
             _logger.LogInformation(
-                "Detection service initialized. {Loaded} of {Total} model(s) loaded successfully.",
+                "Detection service initialized. {Loaded} of {Total} model(s) loaded.",
                 _detectors.Count, modelConfigs.Count(m => m.Enabled));
         }
 
         /// <inheritdoc />
         public async Task<DetectionResponse> DetectAsync(
-            byte[] imageBytes, string imageName, float? confidenceThreshold = null)
+            byte[] imageBytes,
+            string imageName,
+            float? confidenceThreshold = null,
+            CancellationToken cancellationToken = default)
         {
-            var stopwatch = Stopwatch.StartNew();
+            var sw = Stopwatch.StartNew();
 
             if (_detectors.Count == 0)
             {
@@ -159,104 +132,117 @@ namespace RoadDefectDetection.Services
                     Success = false,
                     Message = "No detection models are currently loaded.",
                     ImageName = imageName,
-                    TotalProblemsFound = 0,
-                    ProcessingTimeMs = stopwatch.Elapsed.TotalMilliseconds,
-                    Detections = new List<DetectionResult>()
+                    ProcessingTimeMs = sw.Elapsed.TotalMilliseconds
                 };
             }
 
             try
             {
-                float? normalizedConfidence = null;
-                if (confidenceThreshold.HasValue)
-                {
-                    normalizedConfidence = confidenceThreshold.Value > 1.0f
-                        ? confidenceThreshold.Value / 100f
-                        : confidenceThreshold.Value;
-
-                    normalizedConfidence = Math.Clamp(normalizedConfidence.Value, 0.01f, 1.0f);
-                }
+                float? normalizedConf = NormalizeConfidence(confidenceThreshold);
 
                 _logger.LogInformation(
-                    "Starting detection on '{ImageName}' ({Size} bytes) with {ModelCount} model(s). Confidence: {Confidence}",
+                    "Detecting on '{Name}' ({Size} bytes), {Models} model(s), confidence: {Conf}",
                     imageName, imageBytes.Length, _detectors.Count,
-                    normalizedConfidence?.ToString("P0") ?? "default");
+                    normalizedConf?.ToString("P0") ?? "default");
 
                 var tasks = _detectors.Select(detector =>
-                    Task.Run(() => detector.Detect(imageBytes, normalizedConfidence))
+                    Task.Run(() => detector.Detect(imageBytes, normalizedConf), cancellationToken)
                 ).ToArray();
 
                 var allResults = await Task.WhenAll(tasks);
 
-                var combinedDetections = allResults
-                    .SelectMany(results => results)
+                var combined = allResults
+                    .SelectMany(r => r)
                     .OrderByDescending(d => d.Confidence)
                     .ToList();
 
-                stopwatch.Stop();
+                sw.Stop();
 
                 _logger.LogInformation(
-                    "Detection complete on '{ImageName}': {Count} defect(s) found in {Time:F1}ms.",
-                    imageName, combinedDetections.Count, stopwatch.Elapsed.TotalMilliseconds);
+                    "Detection on '{Name}': {Count} defect(s) in {Time:F1}ms.",
+                    imageName, combined.Count, sw.Elapsed.TotalMilliseconds);
 
                 return new DetectionResponse
                 {
                     Success = true,
-                    Message = combinedDetections.Count > 0
-                        ? $"Detection completed. Found {combinedDetections.Count} potential defect(s)."
+                    Message = combined.Count > 0
+                        ? $"Detection completed. Found {combined.Count} potential defect(s)."
                         : "Detection completed. No defects found.",
                     ImageName = imageName,
-                    TotalProblemsFound = combinedDetections.Count,
-                    ProcessingTimeMs = Math.Round(stopwatch.Elapsed.TotalMilliseconds, 1),
-                    Detections = combinedDetections
+                    TotalProblemsFound = combined.Count,
+                    ProcessingTimeMs = Math.Round(sw.Elapsed.TotalMilliseconds, 1),
+                    Detections = combined
+                };
+            }
+            catch (OperationCanceledException)
+            {
+                sw.Stop();
+                _logger.LogInformation("Detection cancelled for '{Name}'.", imageName);
+                return new DetectionResponse
+                {
+                    Success = false,
+                    Message = "Detection was cancelled.",
+                    ImageName = imageName,
+                    ProcessingTimeMs = Math.Round(sw.Elapsed.TotalMilliseconds, 1)
                 };
             }
             catch (Exception ex)
             {
-                stopwatch.Stop();
-                _logger.LogError(ex, "Error during detection on '{ImageName}'.", imageName);
-
+                sw.Stop();
+                _logger.LogError(ex, "Error during detection on '{Name}'.", imageName);
                 return new DetectionResponse
                 {
                     Success = false,
-                    Message = $"Detection failed: {ex.Message}",
+                    Message = "Detection failed. See server logs for details.",
                     ImageName = imageName,
-                    TotalProblemsFound = 0,
-                    ProcessingTimeMs = Math.Round(stopwatch.Elapsed.TotalMilliseconds, 1),
-                    Detections = new List<DetectionResult>()
+                    ProcessingTimeMs = Math.Round(sw.Elapsed.TotalMilliseconds, 1)
                 };
             }
         }
 
         /// <inheritdoc />
         public async Task<List<DetectionResponse>> DetectMultipleAsync(
-            List<(byte[] bytes, string name)> images, float? confidenceThreshold = null)
+            List<(byte[] bytes, string name)> images,
+            float? confidenceThreshold = null,
+            CancellationToken cancellationToken = default)
         {
-            _logger.LogInformation("Starting batch detection on {Count} image(s).", images.Count);
+            _logger.LogInformation("Batch detection on {Count} image(s).", images.Count);
 
-            var responses = new List<DetectionResponse>(images.Count);
+            int maxConcurrent = Math.Max(1, _settings.MaxConcurrentDetections);
+            var semaphore = new SemaphoreSlim(maxConcurrent, maxConcurrent);
+            var responses = new DetectionResponse[images.Count];
 
-            foreach (var (bytes, name) in images)
+            var tasks = images.Select(async (item, index) =>
             {
-                var response = await DetectAsync(bytes, name, confidenceThreshold);
-                responses.Add(response);
-            }
+                await semaphore.WaitAsync(cancellationToken);
+                try
+                {
+                    responses[index] = await DetectAsync(
+                        item.bytes, item.name, confidenceThreshold, cancellationToken);
+                }
+                finally
+                {
+                    semaphore.Release();
+                }
+            });
 
-            int totalDefects = responses.Sum(r => r.TotalProblemsFound);
+            await Task.WhenAll(tasks);
+
+            int total = responses.Sum(r => r.TotalProblemsFound);
             _logger.LogInformation(
-                "Batch detection complete. Processed {ImageCount} image(s), found {DefectCount} total defect(s).",
-                images.Count, totalDefects);
+                "Batch complete. {Images} image(s), {Defects} total defect(s).",
+                images.Count, total);
 
-            return responses;
+            return responses.ToList();
         }
 
         /// <inheritdoc />
-        public List<object> GetLoadedModels()
+        public List<ModelLoadedInfo> GetLoadedModels()
         {
-            return _detectors.Select(d => (object)new
+            return _detectors.Select(d => new ModelLoadedInfo
             {
                 Name = d.ModelName,
-                d.ModelId,
+                ModelId = d.ModelId,
                 Classes = d.ClassNames,
                 ClassCount = d.ClassNames.Length,
                 Status = "Loaded"
@@ -264,29 +250,32 @@ namespace RoadDefectDetection.Services
         }
 
         /// <inheritdoc />
-        public bool IsHealthy()
-        {
-            return _detectors.Count > 0;
-        }
+        public bool IsHealthy() => _detectors.Count > 0;
 
         public void Dispose()
         {
-            if (!_disposed)
+            if (_disposed) return;
+            _logger.LogInformation(
+                "Disposing detection service ({Count} model(s)).", _detectors.Count);
+            foreach (var d in _detectors)
             {
-                _logger.LogInformation("Disposing detection service and releasing {Count} model(s).", _detectors.Count);
-
-                foreach (var detector in _detectors)
+                try { d.Dispose(); }
+                catch (Exception ex)
                 {
-                    try { detector.Dispose(); }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Error disposing detector '{ModelName}'.", detector.ModelName);
-                    }
+                    _logger.LogError(ex, "Error disposing detector '{Name}'.", d.ModelName);
                 }
-
-                _detectors.Clear();
-                _disposed = true;
             }
+            _detectors.Clear();
+            _disposed = true;
+        }
+
+        // ── Helpers ─────────────────────────────────────────────
+
+        private static float? NormalizeConfidence(float? raw)
+        {
+            if (!raw.HasValue) return null;
+            float v = raw.Value > 1.0f ? raw.Value / 100f : raw.Value;
+            return Math.Clamp(v, 0.01f, 1.0f);
         }
     }
 }

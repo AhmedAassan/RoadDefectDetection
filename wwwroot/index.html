@@ -118,16 +118,6 @@
             }
         }
 
-        @keyframes pulse {
-            0%,100% {
-                opacity: 1;
-            }
-
-            50% {
-                opacity: 0.5;
-            }
-        }
-
         @keyframes spin {
             to {
                 transform: rotate(360deg);
@@ -190,6 +180,23 @@
             }
         }
 
+        @keyframes indeterminate {
+            0% {
+                left: -40%;
+                width: 40%;
+            }
+
+            50% {
+                left: 30%;
+                width: 50%;
+            }
+
+            100% {
+                left: 100%;
+                width: 40%;
+            }
+        }
+
         .animate-in {
             animation: fadeInUp 0.6s ease forwards;
         }
@@ -211,11 +218,6 @@
 
         .animate-delay-4 {
             animation-delay: 0.4s;
-            opacity: 0;
-        }
-
-        .animate-delay-5 {
-            animation-delay: 0.5s;
             opacity: 0;
         }
 
@@ -251,7 +253,7 @@
         .header-icon {
             width: 44px;
             height: 44px;
-            background: linear-gradient(135deg,var(--accent),#0066FF);
+            background: linear-gradient(135deg, var(--accent), #0066FF);
             border-radius: 10px;
             display: flex;
             align-items: center;
@@ -262,7 +264,7 @@
         .header-title {
             font-size: 22px;
             font-weight: 700;
-            background: linear-gradient(135deg,var(--text-primary),var(--accent));
+            background: linear-gradient(135deg, var(--text-primary), var(--accent));
             -webkit-background-clip: text;
             background-clip: text;
             -webkit-text-fill-color: transparent;
@@ -278,6 +280,7 @@
             display: flex;
             align-items: center;
             gap: 12px;
+            flex-wrap: wrap;
         }
 
         .health-indicator {
@@ -291,7 +294,12 @@
             font-size: 13px;
             color: var(--text-secondary);
             cursor: default;
+            transition: var(--transition);
         }
+
+            .health-indicator:hover {
+                border-color: var(--accent-dim);
+            }
 
         .health-dot {
             width: 8px;
@@ -299,6 +307,7 @@
             border-radius: 50%;
             background: var(--text-dim);
             transition: var(--transition);
+            flex-shrink: 0;
         }
 
             .health-dot.online {
@@ -310,6 +319,43 @@
             .health-dot.offline {
                 background: var(--danger);
                 box-shadow: 0 0 8px var(--danger);
+            }
+
+            .health-dot.partial {
+                background: var(--warning);
+                box-shadow: 0 0 8px var(--warning);
+                animation: dotPulse 2s infinite;
+            }
+
+        /* OpenCV status pill inside header */
+        .opencv-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+            transition: var(--transition);
+        }
+
+            .opencv-pill.ok {
+                background: rgba(0,255,136,0.12);
+                color: var(--success);
+                border: 1px solid rgba(0,255,136,0.25);
+            }
+
+            .opencv-pill.bad {
+                background: rgba(255,107,107,0.12);
+                color: var(--danger);
+                border: 1px solid rgba(255,107,107,0.25);
+            }
+
+            .opencv-pill.unknown {
+                background: rgba(100,116,139,0.15);
+                color: var(--text-dim);
+                border: 1px solid rgba(100,116,139,0.3);
             }
 
         .models-badge {
@@ -445,8 +491,8 @@
             left: 0;
             width: 100%;
             height: 2px;
-            background: linear-gradient(90deg,transparent,var(--accent),transparent);
-            box-shadow: 0 0 15px var(--accent),0 0 30px var(--accent-glow);
+            background: linear-gradient(90deg, transparent, var(--accent), transparent);
+            box-shadow: 0 0 15px var(--accent), 0 0 30px var(--accent-glow);
             pointer-events: none;
             display: none;
             z-index: 10;
@@ -641,7 +687,7 @@
             padding-top: 6px;
             border-top: 1px solid var(--border-glass);
             display: none;
-            font-family: 'Courier New',monospace;
+            font-family: 'Courier New', monospace;
         }
 
         .detection-card.expanded .detection-coords {
@@ -710,7 +756,7 @@
                 border: 1px solid var(--border-glass);
             }
 
-        /* ── No Detections ───────────────────────────────────── */
+        /* ── No Detections / Empty States ────────────────────── */
         .no-detections {
             display: flex;
             flex-direction: column;
@@ -738,7 +784,7 @@
         }
 
         .skeleton {
-            background: linear-gradient(90deg,var(--bg-glass) 25%,rgba(255,255,255,0.06) 50%,var(--bg-glass) 75%);
+            background: linear-gradient(90deg, var(--bg-glass) 25%, rgba(255,255,255,0.06) 50%, var(--bg-glass) 75%);
             background-size: 200% 100%;
             animation: shimmer 1.5s infinite;
             border-radius: var(--radius-sm);
@@ -843,6 +889,10 @@
             display: none;
         }
 
+        #videoFileInput {
+            display: none;
+        }
+
         .upload-actions {
             display: flex;
             gap: 12px;
@@ -874,7 +924,7 @@
             }
 
         .btn-primary {
-            background: linear-gradient(135deg,var(--accent),#0088CC);
+            background: linear-gradient(135deg, var(--accent), #0088CC);
             color: #000;
         }
 
@@ -895,6 +945,16 @@
                 color: var(--accent);
             }
 
+        .btn-danger {
+            background: rgba(255,107,107,0.15);
+            border: 1px solid rgba(255,107,107,0.3);
+            color: var(--danger);
+        }
+
+            .btn-danger:hover:not(:disabled) {
+                background: rgba(255,107,107,0.25);
+            }
+
         .btn .spinner {
             width: 16px;
             height: 16px;
@@ -912,6 +972,17 @@
         .btn.loading .btn-text {
             display: none;
         }
+
+        /* Cancel button — only visible during processing */
+        #cancelBtn {
+            display: none;
+            flex: 0 0 auto;
+            padding: 12px 16px;
+        }
+
+            #cancelBtn.visible {
+                display: flex;
+            }
 
         .file-info {
             display: none;
@@ -1067,7 +1138,7 @@
 
         .progress-fill {
             height: 100%;
-            background: linear-gradient(90deg,var(--accent),#0088CC);
+            background: linear-gradient(90deg, var(--accent), #0088CC);
             border-radius: 2px;
             transition: width 0.3s ease;
             width: 0;
@@ -1197,7 +1268,7 @@
             font-weight: 700;
             color: var(--accent);
             text-align: center;
-            font-family: 'Courier New',monospace;
+            font-family: 'Courier New', monospace;
         }
 
         /* ── Mode Toggle ─────────────────────────────────────── */
@@ -1404,7 +1475,7 @@
             font-weight: 600;
             color: var(--accent);
             min-width: 60px;
-            font-family: 'Courier New',monospace;
+            font-family: 'Courier New', monospace;
         }
 
         .frame-info {
@@ -1534,6 +1605,7 @@
                     border-color: var(--accent);
                 }
 
+        /* ── Video Progress (indeterminate) ──────────────────── */
         .video-progress {
             display: none;
             padding: 12px 20px;
@@ -1549,20 +1621,44 @@
             border-radius: 3px;
             overflow: hidden;
             margin-bottom: 8px;
+            position: relative;
         }
 
+        /* Determinate fill */
         .video-progress-fill {
             height: 100%;
-            background: linear-gradient(90deg,var(--accent),#0088CC);
+            background: linear-gradient(90deg, var(--accent), #0088CC);
             border-radius: 3px;
-            transition: width 0.3s ease;
+            transition: width 0.4s ease;
             width: 0;
+        }
+
+        /* Indeterminate overlay — shown when progress is unknown */
+        .video-progress-bar.indeterminate .video-progress-fill {
+            display: none;
+        }
+
+        .video-progress-bar.indeterminate::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, var(--accent), transparent);
+            border-radius: 3px;
+            animation: indeterminate 1.4s ease-in-out infinite;
         }
 
         .video-progress-text {
             font-size: 12px;
             color: var(--text-dim);
             text-align: center;
+        }
+
+        .video-progress-elapsed {
+            font-size: 11px;
+            color: var(--text-dim);
+            text-align: center;
+            margin-top: 4px;
         }
 
         .download-video-btn {
@@ -1573,7 +1669,7 @@
             width: 100%;
             padding: 10px;
             margin-top: 8px;
-            background: linear-gradient(135deg,var(--accent),#0088CC);
+            background: linear-gradient(135deg, var(--accent), #0088CC);
             border: none;
             border-radius: var(--radius-sm);
             color: #000;
@@ -1782,7 +1878,7 @@
         }
 
         /* ── Responsive ──────────────────────────────────────── */
-        @media (max-width:1024px) {
+        @media (max-width: 1024px) {
             .main-grid {
                 grid-template-columns: 1fr;
             }
@@ -1796,7 +1892,7 @@
             }
         }
 
-        @media (max-width:768px) {
+        @media (max-width: 768px) {
             .app-container {
                 padding: 12px;
             }
@@ -1851,11 +1947,15 @@
                 </div>
             </div>
             <div class="header-right">
-                <div class="models-badge" id="modelsBadge" onclick="showModelsModal()" title="View loaded models & mappings">
+                <!-- OpenCV pipeline status pill -->
+                <span class="opencv-pill unknown" id="opencvPill" title="OpenCV video pipeline status">
+                    ⚙️ OpenCV
+                </span>
+                <div class="models-badge" id="modelsBadge" onclick="showModelsModal()" title="View loaded models &amp; mappings">
                     🤖 Models
                     <span class="models-badge-count" id="modelsCount">0</span>
                 </div>
-                <div class="health-indicator" id="healthIndicator">
+                <div class="health-indicator" id="healthIndicator" title="Detection service status">
                     <span class="health-dot" id="healthDot"></span>
                     <span id="healthText">Checking...</span>
                 </div>
@@ -1894,7 +1994,9 @@
             <div class="glass-card results-section animate-in animate-delay-2">
                 <div class="card-header">
                     <div class="card-title">📊 Detection Results</div>
-                    <button class="export-btn" id="exportBtn" style="display:none; width:auto; flex:none; padding:6px 12px; font-size:12px;" onclick="exportReport()">
+                    <button class="export-btn" id="exportBtn"
+                            style="display:none; width:auto; flex:none; padding:6px 12px; font-size:12px;"
+                            onclick="exportReport()">
                         📥 Export
                     </button>
                 </div>
@@ -1919,21 +2021,26 @@
             <div class="card-body" style="padding-bottom:0;">
                 <div class="upload-zone" id="uploadZone">
                     <span class="upload-icon" id="uploadIcon">📁</span>
-                    <div class="upload-title" id="uploadTitle">Drag & Drop files here</div>
+                    <div class="upload-title" id="uploadTitle">Drag &amp; Drop files here</div>
                     <div class="upload-subtitle">or click to browse files</div>
                     <div class="upload-formats" id="uploadFormats">
-                        <span class="format-badge">JPG</span><span class="format-badge">JPEG</span>
-                        <span class="format-badge">PNG</span><span class="format-badge">BMP</span>
+                        <span class="format-badge">JPG</span>
+                        <span class="format-badge">JPEG</span>
+                        <span class="format-badge">PNG</span>
+                        <span class="format-badge">BMP</span>
                         <span class="format-badge">Max 50MB</span>
                     </div>
                     <div class="upload-formats hidden" id="uploadFormatsVideo">
-                        <span class="format-badge">MP4</span><span class="format-badge">AVI</span>
-                        <span class="format-badge">MOV</span><span class="format-badge">MKV</span>
-                        <span class="format-badge">WEBM</span><span class="format-badge">Max 500MB</span>
+                        <span class="format-badge">MP4</span>
+                        <span class="format-badge">AVI</span>
+                        <span class="format-badge">MOV</span>
+                        <span class="format-badge">MKV</span>
+                        <span class="format-badge">WEBM</span>
+                        <span class="format-badge">Max 500MB</span>
                     </div>
                 </div>
                 <input type="file" id="fileInput" accept=".jpg,.jpeg,.png,.bmp" multiple>
-                <input type="file" id="videoFileInput" accept=".mp4,.avi,.mov,.mkv,.wmv,.flv,.webm" style="display:none;">
+                <input type="file" id="videoFileInput" accept=".mp4,.avi,.mov,.mkv,.wmv,.flv,.webm">
             </div>
             <div class="file-info" id="fileInfo">
                 <span class="file-info-icon">🖼️</span>
@@ -1945,10 +2052,11 @@
             </div>
             <div class="confidence-setting">
                 <label for="confidenceSlider">🎯 Confidence:</label>
-                <input type="range" id="confidenceSlider" class="confidence-slider" min="0" max="100" value="15" oninput="updateConfidenceDisplay()">
+                <input type="range" id="confidenceSlider" class="confidence-slider"
+                       min="0" max="100" value="15" oninput="updateConfidenceDisplay()">
                 <span class="confidence-display" id="confidenceDisplay">15%</span>
             </div>
-            <!-- External Mapping Toggle -->
+            <!-- External Mapping Toggle (image mode only) -->
             <div class="output-toggle" id="outputToggle">
                 <label>📡 Output:</label>
                 <span class="output-mode-label active" id="labelStandard">Standard</span>
@@ -1958,6 +2066,7 @@
                 </label>
                 <span class="output-mode-label" id="labelMapped">External Mapped</span>
             </div>
+            <!-- Video-specific settings -->
             <div class="video-settings hidden" id="videoSettings">
                 <div class="video-setting">
                     <label>🎞️ Frame Interval:</label>
@@ -1968,16 +2077,24 @@
                     <input type="number" id="maxFramesInput" value="120" min="1" max="1000">
                 </div>
             </div>
+            <!-- Video processing progress -->
             <div class="video-progress" id="videoProgress">
-                <div class="video-progress-bar"><div class="video-progress-fill" id="videoProgressFill"></div></div>
+                <div class="video-progress-bar indeterminate" id="videoProgressBar">
+                    <div class="video-progress-fill" id="videoProgressFill"></div>
+                </div>
                 <div class="video-progress-text" id="videoProgressText">Processing video...</div>
+                <div class="video-progress-elapsed" id="videoProgressElapsed"></div>
             </div>
+            <!-- Action buttons -->
             <div class="upload-actions">
-                <button class="btn btn-primary" id="detectBtn" onclick="detectSingle()" disabled>
+                <button class="btn btn-primary" id="detectBtn" onclick="handleDetectClick()" disabled>
                     <span class="spinner"></span><span class="btn-text">🔍 Detect</span>
                 </button>
                 <button class="btn btn-secondary" id="detectAllBtn" onclick="detectAll()" disabled>
                     <span class="spinner"></span><span class="btn-text">🔍 Detect All</span>
+                </button>
+                <button class="btn btn-danger" id="cancelBtn" onclick="cancelProcessing()" title="Cancel current operation">
+                    <span class="btn-text">✕ Cancel</span>
                 </button>
             </div>
         </div>
@@ -1986,7 +2103,8 @@
         <div class="glass-card thumbnails-section animate-in animate-delay-4" id="thumbnailsSection">
             <div class="card-header">
                 <div class="card-title">📸 Uploaded Images</div>
-                <span class="card-title" id="thumbCount" style="font-weight:400; font-size:13px; color:var(--text-dim);"></span>
+                <span class="card-title" id="thumbCount"
+                      style="font-weight:400; font-size:13px; color:var(--text-dim);"></span>
             </div>
             <div class="thumbnails-strip" id="thumbnailsStrip"></div>
             <div class="batch-progress" id="batchProgress">
@@ -1995,13 +2113,12 @@
             </div>
         </div>
 
-    </div>
-
+    </div><!-- /.app-container -->
     <!-- Models Modal -->
     <div class="modal-overlay" id="modelsModal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>🤖 Loaded Models & Mappings</h2>
+                <h2>🤖 Loaded Models &amp; Mappings</h2>
                 <button class="modal-close" onclick="closeModelsModal()">✕</button>
             </div>
             <div class="modal-body" id="modelsModalBody">
@@ -2020,18 +2137,23 @@
         const state = {
             files: [],
             currentIndex: 0,
-            results: new Map(),       // standard results
-            mappedResults: new Map(),  // mapped results
+            results: new Map(),       // standard  results  (index → DetectionResponse)
+            mappedResults: new Map(),       // mapped    results  (index → MappedDetectionResponse)
             zoomLevel: 1,
             isProcessing: false,
             currentImage: null,
-            mode: 'image',            // 'image' or 'video'
-            useMapped: false,         // toggle for external mapping
+            mode: 'image',         // 'image' | 'video'
+            useMapped: false,
             videoFile: null,
             videoResult: null,
             activeVideoTab: 'unique',
-            modelsInfo: null,
-            mappingsInfo: null
+            // OpenCV / health state
+            opencvAvailable: null,           // null = unknown, true/false after check
+            modelsLoaded: 0,
+            // Object URLs to revoke on cleanup
+            _objectUrls: [],
+            // AbortController for cancellable fetch
+            _abortController: null
         };
 
         /* ============================================================
@@ -2046,6 +2168,7 @@
         const videoFileInput = $('videoFileInput');
         const detectBtn = $('detectBtn');
         const detectAllBtn = $('detectAllBtn');
+        const cancelBtn = $('cancelBtn');
         const resultsBody = $('resultsBody');
         const canvasPlaceholder = $('canvasPlaceholder');
         const scanLine = $('scanLine');
@@ -2054,14 +2177,220 @@
         const exportBtnEl = $('exportBtn');
 
         /* ============================================================
-           TRACK COLORS (match backend)
+           TRACK COLORS (mirror backend BoxColors — converted to CSS hex)
            ============================================================ */
         const TRACK_COLORS = [
-            '#FF6B6B', '#00FF88', '#00D4FF', '#FFB800', '#FF44FF', '#44FFFF',
-            '#FF8844', '#88FF44', '#4488FF', '#FF4488', '#FFFF44', '#44FF88'
+            '#FF6B6B', '#00FF88', '#00D4FF', '#FFB800', '#FF44FF',
+            '#44FFFF', '#FF8844', '#88FF44', '#4488FF', '#FF4488'
         ];
         function getTrackColor(trackId) {
-            return TRACK_COLORS[(trackId - 1) % TRACK_COLORS.length];
+            return TRACK_COLORS[(Math.max(1, trackId) - 1) % TRACK_COLORS.length];
+        }
+
+        /* ============================================================
+           ABORT / CANCEL
+           ============================================================ */
+        function newAbortController() {
+            if (state._abortController) {
+                try { state._abortController.abort(); } catch (_) { }
+            }
+            state._abortController = new AbortController();
+            return state._abortController;
+        }
+
+        function cancelProcessing() {
+            if (!state.isProcessing) return;
+            if (state._abortController) {
+                state._abortController.abort();
+            }
+            showToast('info', 'Cancelling operation…');
+        }
+
+        /* ============================================================
+           HEALTH CHECK  (image service + video/OpenCV service)
+           ============================================================ */
+        async function checkHealth() {
+            // Run both checks in parallel — neither blocks the other
+            const [imgResult, vidResult] = await Promise.allSettled([
+                fetch('/api/detection/health', { signal: AbortSignal.timeout(5000) })
+                    .then(r => r.json()),
+                fetch('/api/videodetection/health', { signal: AbortSignal.timeout(5000) })
+                    .then(r => r.json())
+            ]);
+
+            // ── Image / models health ────────────────────────────────
+            if (imgResult.status === 'fulfilled') {
+                const d = imgResult.value;
+                const healthy = !!d.isHealthy;
+                $('healthDot').className = healthy ? 'health-dot online' : 'health-dot offline';
+                $('healthText').textContent = healthy ? 'System Online' : 'No Models';
+                $('modelsCount').textContent = d.loadedModels ?? 0;
+                state.modelsLoaded = d.loadedModels ?? 0;
+            } else {
+                $('healthDot').className = 'health-dot offline';
+                $('healthText').textContent = 'Offline';
+                $('modelsCount').textContent = '0';
+                state.modelsLoaded = 0;
+            }
+
+            // ── Video / OpenCV health ────────────────────────────────
+            if (vidResult.status === 'fulfilled') {
+                const d = vidResult.value;
+                // Backend now returns opencvAvailable (not ffmpegAvailable)
+                const opencvOk = !!d.opencvAvailable;
+                state.opencvAvailable = opencvOk;
+                updateOpencvPill(opencvOk);
+
+                // If both services are healthy but models are missing, show partial
+                if (opencvOk && state.modelsLoaded > 0) {
+                    $('healthDot').className = 'health-dot online';
+                } else if (state.modelsLoaded > 0 && !opencvOk) {
+                    // Models OK but video unavailable → partial
+                    $('healthDot').className = 'health-dot partial';
+                    $('healthText').textContent = 'Video Unavailable';
+                }
+            } else {
+                // Video endpoint unreachable — assume unknown
+                state.opencvAvailable = null;
+                updateOpencvPill(null);
+            }
+        }
+
+        function updateOpencvPill(available) {
+            const pill = $('opencvPill');
+            if (available === null) {
+                pill.className = 'opencv-pill unknown';
+                pill.title = 'OpenCV video pipeline status unknown';
+                pill.textContent = '⚙️ OpenCV';
+            } else if (available) {
+                pill.className = 'opencv-pill ok';
+                pill.title = 'OpenCV video pipeline is available';
+                pill.textContent = '✅ OpenCV';
+            } else {
+                pill.className = 'opencv-pill bad';
+                pill.title = 'OpenCV native library unavailable. Install OpenCvSharp4 runtime package.';
+                pill.textContent = '⚠️ OpenCV';
+            }
+        }
+
+        // Initial check + polling every 30 s
+        checkHealth();
+        setInterval(checkHealth, 30000);
+
+        /* ============================================================
+           MODELS MODAL
+           ============================================================ */
+        async function showModelsModal() {
+            $('modelsModal').classList.add('visible');
+            $('modelsModalBody').innerHTML =
+                '<div style="text-align:center;color:var(--text-dim);padding:20px;">Loading...</div>';
+            try {
+                const [mR, mpR] = await Promise.all([
+                    fetch('/api/detection/models'),
+                    fetch('/api/detection/mappings')
+                ]);
+                const modelsData = await mR.json();
+                const mappingsData = await mpR.json();
+                renderModelsModal(modelsData, mappingsData);
+            } catch (err) {
+                $('modelsModalBody').innerHTML =
+                    `<div style="text-align:center;color:var(--danger);padding:20px;">
+                    Failed to load: ${err.message}
+                 </div>`;
+            }
+        }
+
+        function closeModelsModal() {
+            $('modelsModal').classList.remove('visible');
+        }
+
+        function renderModelsModal(modelsData, mappingsData) {
+            const models = modelsData.models || [];
+            const mappings = mappingsData.mappings || [];
+
+            if (!models.length) {
+                $('modelsModalBody').innerHTML =
+                    '<div style="text-align:center;color:var(--text-dim);padding:20px;">No models loaded.</div>';
+                return;
+            }
+
+            let html = '';
+            models.forEach(model => {
+                const modelMappings = mappings.filter(m => m.modelId === model.modelId);
+                const classes = model.classes || [];
+
+                html += `<div class="model-item">
+                <div class="model-item-header">
+                    <span class="model-item-name">${escHtml(model.name)}</span>
+                    <span class="model-item-id">ID: ${model.modelId}</span>
+                </div>
+                <div style="font-size:12px;color:var(--text-dim);margin-bottom:6px;">
+                    ${model.classCount} class(es) ·
+                    Status: <span style="color:var(--success);">${escHtml(model.status)}</span>
+                </div>
+                <div class="model-item-classes">
+                    ${classes.map((c, idx) =>
+                    `<span class="model-class-chip" title="Index: ${idx}">${idx}: ${escHtml(c)}</span>`
+                ).join('')}
+                </div>`;
+
+                if (modelMappings.length > 0) {
+                    html += `<div class="mapping-section">
+                    <div class="mapping-section-title">📡 External System Mappings</div>`;
+                    modelMappings.forEach(m => {
+                        const internalName = classes[m.internalModelClassIndex]
+                            || `Index ${m.internalModelClassIndex}`;
+                        const sevClass = m.severity
+                            ? `severity-${m.severity.toLowerCase()}`
+                            : '';
+                        html += `<div class="mapping-row">
+                        <span style="color:var(--text-secondary);">${escHtml(internalName)}</span>
+                        <span class="mapping-arrow">→</span>
+                        <span class="mapping-badge external">ID:${m.externalClassId}</span>
+                        <span style="color:var(--purple);font-weight:600;">${escHtml(m.externalClassName)}</span>
+                        ${m.severity ? `<span class="mapping-badge ${sevClass}">${escHtml(m.severity)}</span>` : ''}
+                        ${m.category ? `<span class="mapping-badge category">${escHtml(m.category)}</span>` : ''}
+                    </div>`;
+                    });
+                    html += '</div>';
+                } else {
+                    html += `<div style="font-size:11px;color:var(--text-dim);margin-top:8px;font-style:italic;">
+                    No external mappings configured for this model.</div>`;
+                }
+                html += '</div>';
+            });
+
+            html += `<div style="text-align:center;font-size:12px;color:var(--text-dim);margin-top:12px;
+                    padding:10px;background:var(--bg-glass);border-radius:var(--radius-sm);
+                    border:1px solid var(--border-glass);">
+            ${models.length} model(s) loaded · ${mappings.length} external mapping(s) configured
+        </div>`;
+
+            $('modelsModalBody').innerHTML = html;
+        }
+
+        $('modelsModal').addEventListener('click', e => {
+            if (e.target === $('modalsModal')) closeModelsModal();
+        });
+        // Also close on overlay background click
+        $('modelsModal').addEventListener('click', e => {
+            if (e.target === $('modelsModal')) closeModelsModal();
+        });
+
+        /* ============================================================
+           TOAST
+           ============================================================ */
+        function showToast(type, message, duration = 4000) {
+            const icons = { success: '✅', error: '❌', warning: '⚠️', info: 'ℹ️' };
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerHTML = `<span class="toast-icon">${icons[type] || 'ℹ️'}</span>
+                           <span>${escHtml(String(message))}</span>`;
+            $('toastContainer').appendChild(toast);
+            setTimeout(() => {
+                toast.classList.add('removing');
+                setTimeout(() => toast.remove(), 300);
+            }, duration);
         }
 
         /* ============================================================
@@ -2072,20 +2401,47 @@
             $('labelStandard').classList.toggle('active', !state.useMapped);
             $('labelMapped').classList.toggle('active', state.useMapped);
 
-            // Re-render current results if available
-            if (state.mode === 'image' && state.files.length > 0) {
-                const resultMap = state.useMapped ? state.mappedResults : state.results;
-                if (resultMap.has(state.currentIndex)) {
-                    const data = resultMap.get(state.currentIndex);
-                    state.useMapped ? renderMappedResults(data) : renderResults(data);
-                    const dets = state.useMapped ? extractDetectionsFromMapped(data) : data.detections;
-                    drawDetections(dets);
+            if (state.mode !== 'image' || !state.files.length) return;
+
+            // If mapped results already cached, render immediately
+            if (state.useMapped) {
+                if (state.mappedResults.has(state.currentIndex)) {
+                    renderMappedResults(state.mappedResults.get(state.currentIndex));
+                    drawDetections(extractDetectionsFromMapped(state.mappedResults.get(state.currentIndex)));
+                } else if (state.results.has(state.currentIndex)) {
+                    // Fetch mapped for current image on-demand
+                    fetchMappedForCurrentAsync();
+                }
+            } else {
+                if (state.results.has(state.currentIndex)) {
+                    const d = state.results.get(state.currentIndex);
+                    renderResults(d);
+                    drawDetections(d.detections);
                 }
             }
         }
 
+        async function fetchMappedForCurrentAsync() {
+            const file = state.files[state.currentIndex];
+            if (!file) return;
+            try {
+                const fd = buildFormData(file);
+                const res = await fetch('/api/detection/detect-mapped', {
+                    method: 'POST', body: fd,
+                    signal: AbortSignal.timeout(30000)
+                });
+                if (!res.ok) return;
+                const data = await res.json();
+                state.mappedResults.set(state.currentIndex, data);
+                if (state.useMapped) {
+                    renderMappedResults(data);
+                    drawDetections(extractDetectionsFromMapped(data));
+                }
+            } catch (_) { /* silent — mapped is optional */ }
+        }
+
         function extractDetectionsFromMapped(mappedResponse) {
-            if (!mappedResponse || !mappedResponse.detections) return [];
+            if (!mappedResponse?.detections) return [];
             return mappedResponse.detections.map(d => ({
                 problem: d.externalClassName || d.internalClassName,
                 confidence: d.confidence,
@@ -2100,184 +2456,75 @@
            MODE SWITCHING
            ============================================================ */
         function switchMode(mode) {
+            if (state.isProcessing) return; // Don't switch mid-operation
             state.mode = mode;
             clearFiles();
+
             $('modeImage').classList.toggle('active', mode === 'image');
             $('modeVideo').classList.toggle('active', mode === 'video');
             $('uploadFormats').classList.toggle('hidden', mode === 'video');
             $('uploadFormatsVideo').classList.toggle('hidden', mode === 'image');
             $('videoSettings').classList.toggle('hidden', mode === 'image');
+            $('outputToggle').classList.toggle('hidden', mode === 'video');
 
             if (mode === 'video') {
                 $('uploadIcon').textContent = '🎬';
                 $('uploadTitle').textContent = 'Drag & Drop video here';
                 detectAllBtn.style.display = 'none';
                 $('previewTitle').textContent = '🎬 Video Preview';
+                fileInput.accept = '.mp4,.avi,.mov,.mkv,.wmv,.flv,.webm';
+                fileInput.removeAttribute('multiple');
             } else {
                 $('uploadIcon').textContent = '📁';
                 $('uploadTitle').textContent = 'Drag & Drop images here';
                 detectAllBtn.style.display = '';
                 $('previewTitle').textContent = '🖼️ Image Preview';
-            }
-
-            if (mode === 'video') {
-                fileInput.accept = '.mp4,.avi,.mov,.mkv,.wmv,.flv,.webm';
-                fileInput.removeAttribute('multiple');
-            } else {
                 fileInput.accept = '.jpg,.jpeg,.png,.bmp';
                 fileInput.setAttribute('multiple', '');
             }
         }
 
         /* ============================================================
-           HEALTH CHECK
-           ============================================================ */
-        async function checkHealth() {
-            try {
-                const res = await fetch('/api/detection/health');
-                const data = await res.json();
-                $('healthDot').className = data.isHealthy ? 'health-dot online' : 'health-dot offline';
-                $('healthText').textContent = data.isHealthy ? 'System Online' : 'No Models';
-                $('modelsCount').textContent = data.loadedModels || 0;
-            } catch {
-                $('healthDot').className = 'health-dot offline';
-                $('healthText').textContent = 'Offline';
-                $('modelsCount').textContent = '0';
-            }
-        }
-        checkHealth();
-        setInterval(checkHealth, 30000);
-
-        /* ============================================================
-           MODELS MODAL
-           ============================================================ */
-        async function showModelsModal() {
-            $('modelsModal').classList.add('visible');
-            $('modelsModalBody').innerHTML = '<div style="text-align:center;color:var(--text-dim);padding:20px;">Loading...</div>';
-
-            try {
-                const [modelsRes, mappingsRes] = await Promise.all([
-                    fetch('/api/detection/models'),
-                    fetch('/api/detection/mappings')
-                ]);
-                const modelsData = await modelsRes.json();
-                const mappingsData = await mappingsRes.json();
-
-                state.modelsInfo = modelsData;
-                state.mappingsInfo = mappingsData;
-
-                renderModelsModal(modelsData, mappingsData);
-            } catch (err) {
-                $('modelsModalBody').innerHTML = `<div style="text-align:center;color:var(--danger);padding:20px;">Failed to load: ${err.message}</div>`;
-            }
-        }
-
-        function closeModelsModal() {
-            $('modelsModal').classList.remove('visible');
-        }
-
-        function renderModelsModal(modelsData, mappingsData) {
-            const models = modelsData.models || [];
-            const mappings = mappingsData.mappings || [];
-
-            if (models.length === 0) {
-                $('modelsModalBody').innerHTML = '<div style="text-align:center;color:var(--text-dim);padding:20px;">No models loaded.</div>';
-                return;
-            }
-
-            let html = '';
-            models.forEach(model => {
-                const modelMappings = mappings.filter(m => m.modelId === model.modelId);
-
-                html += `<div class="model-item">
-                        <div class="model-item-header">
-                            <span class="model-item-name">${model.name}</span>
-                            <span class="model-item-id">ID: ${model.modelId}</span>
-                        </div>
-                        <div style="font-size:12px;color:var(--text-dim);margin-bottom:6px;">
-                            ${model.classCount} class(es) · Status: <span style="color:var(--success);">${model.status}</span>
-                        </div>
-                        <div class="model-item-classes">
-                            ${model.classes.map((c, idx) => `<span class="model-class-chip" title="Index: ${idx}">${idx}: ${c}</span>`).join('')}
-                        </div>`;
-
-                if (modelMappings.length > 0) {
-                    html += `<div class="mapping-section">
-                            <div class="mapping-section-title">📡 External System Mappings</div>`;
-                    modelMappings.forEach(m => {
-                        const internalName = model.classes[m.internalModelClassIndex] || `Index ${m.internalModelClassIndex}`;
-                        html += `<div class="mapping-row">
-                                <span style="color:var(--text-secondary);">${internalName}</span>
-                                <span class="mapping-arrow">→</span>
-                                <span class="mapping-badge external">ID:${m.externalClassId}</span>
-                                <span style="color:var(--purple);font-weight:600;">${m.externalClassName}</span>
-                                ${m.severity ? `<span class="mapping-badge severity-${m.severity.toLowerCase()}">${m.severity}</span>` : ''}
-                                ${m.category ? `<span class="mapping-badge category">${m.category}</span>` : ''}
-                            </div>`;
-                    });
-                    html += '</div>';
-                } else {
-                    html += `<div style="font-size:11px;color:var(--text-dim);margin-top:8px;font-style:italic;">
-                            No external mappings configured for this model.</div>`;
-                }
-
-                html += '</div>';
-            });
-
-            // Summary
-            html += `<div style="text-align:center;font-size:12px;color:var(--text-dim);margin-top:12px;padding:10px;
-                    background:var(--bg-glass);border-radius:var(--radius-sm);border:1px solid var(--border-glass);">
-                    ${models.length} model(s) loaded · ${mappings.length} external mapping(s) configured
-                </div>`;
-
-            $('modelsModalBody').innerHTML = html;
-        }
-
-        // Close modal on overlay click
-        $('modelsModal').addEventListener('click', e => {
-            if (e.target === $('modelsModal')) closeModelsModal();
-        });
-
-        /* ============================================================
-           TOAST
-           ============================================================ */
-        function showToast(type, message, duration = 3000) {
-            const icons = { success: '✅', error: '❌', warning: '⚠️', info: 'ℹ️' };
-            const toast = document.createElement('div');
-            toast.className = `toast ${type}`;
-            toast.innerHTML = `<span class="toast-icon">${icons[type] || 'ℹ️'}</span><span>${message}</span>`;
-            $('toastContainer').appendChild(toast);
-            setTimeout(() => { toast.classList.add('removing'); setTimeout(() => toast.remove(), 300); }, duration);
-        }
-
-        /* ============================================================
            FILE HANDLING
            ============================================================ */
         uploadZone.addEventListener('click', () => {
-            state.mode === 'video' ? videoFileInput.click() : fileInput.click();
+            if (state.mode === 'video') videoFileInput.click();
+            else fileInput.click();
         });
+
         fileInput.addEventListener('change', e => {
-            if (e.target.files.length > 0) {
-                state.mode === 'video' ? handleVideoFile(e.target.files[0]) : handleFiles(Array.from(e.target.files));
-            }
+            if (!e.target.files.length) return;
+            if (state.mode === 'video') handleVideoFile(e.target.files[0]);
+            else handleFiles(Array.from(e.target.files));
+            e.target.value = ''; // Allow re-selecting same file
         });
+
         videoFileInput.addEventListener('change', e => {
-            if (e.target.files.length > 0) handleVideoFile(e.target.files[0]);
+            if (e.target.files.length) handleVideoFile(e.target.files[0]);
+            e.target.value = '';
         });
+
         uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
         uploadZone.addEventListener('dragleave', e => { e.preventDefault(); uploadZone.classList.remove('drag-over'); });
         uploadZone.addEventListener('drop', e => {
             e.preventDefault(); uploadZone.classList.remove('drag-over');
-            if (e.dataTransfer.files.length > 0) {
-                state.mode === 'video' ? handleVideoFile(e.dataTransfer.files[0]) : handleFiles(Array.from(e.dataTransfer.files));
-            }
+            if (!e.dataTransfer.files.length) return;
+            if (state.mode === 'video') handleVideoFile(e.dataTransfer.files[0]);
+            else handleFiles(Array.from(e.dataTransfer.files));
         });
+
         document.addEventListener('paste', e => {
+            if (state.mode !== 'image' || state.isProcessing) return;
             const items = e.clipboardData?.items;
             if (!items) return;
             const imgs = [];
-            for (const item of items) { if (item.type.startsWith('image/')) { const f = item.getAsFile(); if (f) imgs.push(f); } }
-            if (imgs.length > 0 && state.mode === 'image') { handleFiles(imgs); showToast('info', 'Image pasted from clipboard.'); }
+            for (const item of items) {
+                if (item.type.startsWith('image/')) {
+                    const f = item.getAsFile();
+                    if (f) imgs.push(f);
+                }
+            }
+            if (imgs.length) { handleFiles(imgs); showToast('info', 'Image pasted from clipboard.'); }
         });
 
         const ALLOWED_IMAGES = ['.jpg', '.jpeg', '.png', '.bmp'];
@@ -2289,59 +2536,105 @@
             const valid = [];
             for (const f of files) {
                 const ext = '.' + f.name.split('.').pop().toLowerCase();
-                if (!ALLOWED_IMAGES.includes(ext)) { showToast('warning', `"${f.name}" skipped — unsupported.`); continue; }
-                if (f.size > MAX_IMAGE_SIZE) { showToast('warning', `"${f.name}" exceeds 50MB.`); continue; }
+                if (!ALLOWED_IMAGES.includes(ext)) { showToast('warning', `"${f.name}" skipped — unsupported format.`); continue; }
+                if (f.size > MAX_IMAGE_SIZE) { showToast('warning', `"${f.name}" exceeds 50MB limit.`); continue; }
                 valid.push(f);
             }
             if (!valid.length) return;
-            state.files = valid; state.currentIndex = 0;
-            state.results.clear(); state.mappedResults.clear();
-            state.videoFile = null; state.videoResult = null;
-            hideVideoPlayer(); updateFileInfo(); buildThumbnails();
-            loadImageToCanvas(0); updateButtons(); clearResults();
+
+            revokeAllObjectUrls();
+            state.files = valid;
+            state.currentIndex = 0;
+            state.results.clear();
+            state.mappedResults.clear();
+            state.videoFile = null;
+            state.videoResult = null;
+
+            hideVideoPlayer();
+            updateFileInfo();
+            buildThumbnails();
+            loadImageToCanvas(0);
+            updateButtons();
+            clearResults();
             showToast('success', `${valid.length} image(s) loaded.`);
         }
 
         function handleVideoFile(file) {
             const ext = '.' + file.name.split('.').pop().toLowerCase();
-            if (!ALLOWED_VIDEOS.includes(ext)) { showToast('warning', `"${file.name}" — unsupported.`); return; }
-            if (file.size > MAX_VIDEO_SIZE) { showToast('warning', `"${file.name}" exceeds 500MB.`); return; }
-            state.videoFile = file; state.files = [];
-            state.results.clear(); state.mappedResults.clear();
+            if (!ALLOWED_VIDEOS.includes(ext)) { showToast('warning', `"${file.name}" — unsupported video format.`); return; }
+            if (file.size > MAX_VIDEO_SIZE) { showToast('warning', `"${file.name}" exceeds 500MB limit.`); return; }
+
+            revokeAllObjectUrls();
+            state.videoFile = file;
+            state.files = [];
+            state.results.clear();
+            state.mappedResults.clear();
             state.videoResult = null;
+
             $('fileInfo').classList.add('visible');
             $('fileName').textContent = file.name;
             $('fileSize').textContent = formatBytes(file.size);
+
             canvas.style.display = 'none';
-            videoPlayer.style.display = 'block';
-            videoPlayer.src = URL.createObjectURL(file);
             canvasPlaceholder.style.display = 'none';
+
+            const objUrl = URL.createObjectURL(file);
+            state._objectUrls.push(objUrl);
+            videoPlayer.src = objUrl;
+            videoPlayer.style.display = 'block';
+
             $('zoomControls').style.display = 'none';
             thumbnailsSection.classList.remove('visible');
-            updateButtons(); clearResults();
+            $('previewTitle').textContent = '🎬 Video Preview';
+
+            updateButtons();
+            clearResults();
             showToast('success', `Video "${file.name}" loaded.`);
         }
 
         function clearFiles() {
-            state.files = []; state.currentIndex = 0;
-            state.results.clear(); state.mappedResults.clear();
-            state.currentImage = null; state.videoFile = null; state.videoResult = null;
+            // Cancel any in-flight operation
+            if (state._abortController) {
+                try { state._abortController.abort(); } catch (_) { }
+                state._abortController = null;
+            }
+
+            revokeAllObjectUrls();
+
+            state.files = [];
+            state.currentIndex = 0;
+            state.results.clear();
+            state.mappedResults.clear();
+            state.currentImage = null;
+            state.videoFile = null;
+            state.videoResult = null;
+
             $('fileInfo').classList.remove('visible');
             thumbnailsSection.classList.remove('visible');
             hideVideoPlayer();
+
             canvas.style.display = 'none';
-            canvasPlaceholder.innerHTML = '<span class="canvas-placeholder-icon">📷</span><span class="canvas-placeholder-text">Upload an image to begin analysis</span>';
+            canvasPlaceholder.innerHTML =
+                '<span class="canvas-placeholder-icon">📷</span>' +
+                '<span class="canvas-placeholder-text">Upload an image to begin analysis</span>';
             canvasPlaceholder.style.display = 'flex';
             $('zoomControls').style.display = 'flex';
+            $('previewTitle').textContent = state.mode === 'video' ? '🎬 Video Preview' : '🖼️ Image Preview';
+
             exportBtnEl.style.display = 'none';
             $('videoProgress').classList.remove('visible');
-            updateButtons(); clearResults();
-            fileInput.value = ''; videoFileInput.value = '';
+            stopElapsedTimer();
+
+            updateButtons();
+            clearResults();
+            fileInput.value = '';
+            videoFileInput.value = '';
         }
 
         function hideVideoPlayer() {
-            videoPlayer.style.display = 'none';
+            if (videoPlayer.style.display === 'none') return;
             videoPlayer.pause();
+            videoPlayer.style.display = 'none';
             videoPlayer.removeAttribute('src');
             videoPlayer.load();
         }
@@ -2371,12 +2664,28 @@
                 detectAllBtn.style.display = '';
                 detectAllBtn.disabled = state.files.length < 2 || state.isProcessing;
             }
+            cancelBtn.classList.toggle('visible', state.isProcessing);
         }
 
         function formatBytes(b) {
             if (b < 1024) return b + ' B';
             if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
             return (b / 1048576).toFixed(1) + ' MB';
+        }
+
+        /* ============================================================
+           OBJECT URL MEMORY MANAGEMENT
+           ============================================================ */
+        function trackObjectUrl(url) {
+            state._objectUrls.push(url);
+            return url;
+        }
+
+        function revokeAllObjectUrls() {
+            for (const url of state._objectUrls) {
+                try { URL.revokeObjectURL(url); } catch (_) { }
+            }
+            state._objectUrls = [];
         }
 
         /* ============================================================
@@ -2387,27 +2696,47 @@
             if (state.files.length < 2) { thumbnailsSection.classList.remove('visible'); return; }
             thumbnailsSection.classList.add('visible');
             $('thumbCount').textContent = `${state.files.length} images`;
+
             state.files.forEach((file, i) => {
                 const item = document.createElement('div');
                 item.className = 'thumbnail-item' + (i === 0 ? ' active' : '');
                 item.onclick = () => switchImage(i);
-                const img = document.createElement('img'); img.src = URL.createObjectURL(file); item.appendChild(img);
-                const badge = document.createElement('div'); badge.className = 'thumbnail-badge'; badge.id = `badge-${i}`; item.appendChild(badge);
-                const name = document.createElement('div'); name.className = 'thumbnail-name'; name.textContent = file.name; item.appendChild(name);
+
+                const img = document.createElement('img');
+                img.src = trackObjectUrl(URL.createObjectURL(file));
+                item.appendChild(img);
+
+                const badge = document.createElement('div');
+                badge.className = 'thumbnail-badge';
+                badge.id = `badge-${i}`;
+                item.appendChild(badge);
+
+                const name = document.createElement('div');
+                name.className = 'thumbnail-name';
+                name.textContent = file.name;
+                item.appendChild(name);
+
                 thumbnailsStrip.appendChild(item);
             });
         }
 
         function switchImage(index) {
             state.currentIndex = index;
-            hideVideoPlayer();
+            // Don't call hideVideoPlayer if we're in video mode
+            if (state.mode === 'image') {
+                videoPlayer.style.display = 'none';
+            }
             loadImageToCanvas(index);
-            document.querySelectorAll('.thumbnail-item').forEach((el, i) => el.classList.toggle('active', i === index));
+            document.querySelectorAll('.thumbnail-item').forEach((el, i) =>
+                el.classList.toggle('active', i === index));
+
             const resultMap = state.useMapped ? state.mappedResults : state.results;
             if (resultMap.has(index)) {
                 const data = resultMap.get(index);
                 state.useMapped ? renderMappedResults(data) : renderResults(data);
-                const dets = state.useMapped ? extractDetectionsFromMapped(data) : data.detections;
+                const dets = state.useMapped
+                    ? extractDetectionsFromMapped(data)
+                    : data.detections;
                 drawDetections(dets);
             } else {
                 clearResults();
@@ -2417,7 +2746,8 @@
         function updateThumbnailBadge(index, count) {
             const badge = $(`badge-${index}`);
             if (!badge) return;
-            badge.textContent = count; badge.classList.add('visible');
+            badge.textContent = count;
+            badge.classList.add('visible');
             badge.classList.toggle('zero', count === 0);
         }
 
@@ -2425,23 +2755,33 @@
            CANVAS & IMAGE
            ============================================================ */
         function loadImageToCanvas(index) {
-            const file = state.files[index]; if (!file) return;
+            const file = state.files[index];
+            if (!file) return;
+
             const img = new Image();
+            const objUrl = trackObjectUrl(URL.createObjectURL(file));
+
             img.onload = () => {
                 state.currentImage = img;
-                canvas.width = img.naturalWidth; canvas.height = img.naturalHeight;
+                canvas.width = img.naturalWidth;
+                canvas.height = img.naturalHeight;
                 ctx.drawImage(img, 0, 0);
-                canvas.style.display = 'block'; canvasPlaceholder.style.display = 'none';
+                canvas.style.display = 'block';
+                canvasPlaceholder.style.display = 'none';
                 $('zoomControls').style.display = 'flex';
-                state.zoomLevel = 1; $('canvasWrapper').style.transform = 'scale(1)';
+                state.zoomLevel = 1;
+                $('canvasWrapper').style.transform = 'scale(1)';
+
                 const resultMap = state.useMapped ? state.mappedResults : state.results;
                 if (resultMap.has(index)) {
                     const data = resultMap.get(index);
-                    const dets = state.useMapped ? extractDetectionsFromMapped(data) : data.detections;
+                    const dets = state.useMapped
+                        ? extractDetectionsFromMapped(data)
+                        : data.detections;
                     drawDetections(dets);
                 }
             };
-            img.src = URL.createObjectURL(file);
+            img.src = objUrl;
         }
 
         function redrawCanvas() {
@@ -2451,7 +2791,9 @@
             const resultMap = state.useMapped ? state.mappedResults : state.results;
             if (resultMap.has(state.currentIndex)) {
                 const data = resultMap.get(state.currentIndex);
-                const dets = state.useMapped ? extractDetectionsFromMapped(data) : data.detections;
+                const dets = state.useMapped
+                    ? extractDetectionsFromMapped(data)
+                    : data.detections;
                 drawDetections(dets);
             }
         }
@@ -2460,7 +2802,11 @@
            BOUNDING BOX DRAWING
            ============================================================ */
         function getConfidenceColor(conf) {
-            return conf >= 0.7 ? 'rgba(0,255,136,' : conf >= 0.4 ? 'rgba(255,184,0,' : 'rgba(255,107,107,';
+            return conf >= 0.7
+                ? 'rgba(0,255,136,'
+                : conf >= 0.4
+                    ? 'rgba(255,184,0,'
+                    : 'rgba(255,107,107,';
         }
         function getConfidenceHex(conf) {
             return conf >= 0.7 ? '#00FF88' : conf >= 0.4 ? '#FFB800' : '#FF6B6B';
@@ -2470,11 +2816,13 @@
             if (!state.currentImage) return;
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.drawImage(state.currentImage, 0, 0);
-            if (!detections || !detections.length) return;
+            if (!detections?.length) return;
+
             detections.forEach((det, i) => {
                 const { x, y, width, height } = det.box;
                 const colorBase = getConfidenceColor(det.confidence);
                 const isHL = i === highlightIndex;
+
                 ctx.strokeStyle = colorBase + (isHL ? '1)' : '0.85)');
                 ctx.lineWidth = isHL ? 3 : 2;
                 if (isHL) { ctx.shadowColor = colorBase + '0.8)'; ctx.shadowBlur = 15; }
@@ -2482,22 +2830,30 @@
                 ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
                 ctx.fillStyle = colorBase + (isHL ? '0.15)' : '0.05)');
                 ctx.fillRect(x, y, width, height);
+
                 const name = det.problem || det.internalClassName || 'Detection';
                 const label = `${name} (${Math.round(det.confidence * 100)}%)`;
                 ctx.font = 'bold 13px Inter, sans-serif';
                 const lW = ctx.measureText(label).width + 10, lH = 22;
-                let lX = x, lY = y - lH - 2; if (lY < 0) lY = y + 2;
+                let lX = x, lY = y - lH - 2;
+                if (lY < 0) lY = y + 2;
+
                 ctx.fillStyle = 'rgba(0,0,0,0.75)';
-                roundRect(ctx, lX, lY, lW, lH, 4); ctx.fill();
+                roundRect(ctx, lX, lY, lW, lH, 4);
+                ctx.fill();
                 ctx.fillStyle = getConfidenceHex(det.confidence);
                 ctx.fillText(label, lX + 5, lY + 15);
             });
         }
 
         function roundRect(ctx, x, y, w, h, r) {
-            ctx.beginPath(); ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y); ctx.arcTo(x + w, y, x + w, y + r, r);
-            ctx.lineTo(x + w, y + h - r); ctx.arcTo(x + w, y + h, x + w - r, y + h, r); ctx.lineTo(x + r, y + h);
-            ctx.arcTo(x, y + h, x, y + h - r, r); ctx.lineTo(x, y + r); ctx.arcTo(x, y, x + r, y, r); ctx.closePath();
+            ctx.beginPath();
+            ctx.moveTo(x + r, y);
+            ctx.lineTo(x + w - r, y); ctx.arcTo(x + w, y, x + w, y + r, r);
+            ctx.lineTo(x + w, y + h - r); ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+            ctx.lineTo(x + r, y + h); ctx.arcTo(x, y + h, x, y + h - r, r);
+            ctx.lineTo(x, y + r); ctx.arcTo(x, y, x + r, y, r);
+            ctx.closePath();
         }
 
         /* ============================================================
@@ -2508,63 +2864,9 @@
         function zoomFit() { state.zoomLevel = 1; $('canvasWrapper').style.transform = 'scale(1)'; }
 
         /* ============================================================
-           API ENDPOINT SELECTION
+           FORM DATA HELPER
            ============================================================ */
-        function getDetectEndpoint() {
-            return state.useMapped ? '/api/detection/detect-mapped' : '/api/detection/detect';
-        }
-        function getDetectMultipleEndpoint() {
-            return state.useMapped ? '/api/detection/detect-mapped-multiple' : '/api/detection/detect-multiple';
-        }
-
-        /* ============================================================
-           DETECT SINGLE (Image)
-           ============================================================ */
-        async function detectSingle() {
-            if (state.mode === 'video') { await detectVideo(); return; }
-            if (!state.files.length || state.isProcessing) return;
-            const file = state.files[state.currentIndex];
-            setProcessing(true); startScan();
-            try {
-                const fd = new FormData();
-                fd.append('image', file);
-                fd.append('confidence', getConfidenceValue());
-
-                // Fetch both standard and mapped in parallel
-                const [stdRes, mapRes] = await Promise.all([
-                    fetch('/api/detection/detect', { method: 'POST', body: fd }),
-                    fetch('/api/detection/detect-mapped', { method: 'POST', body: createFormData(file) })
-                ]);
-
-                if (!stdRes.ok) { const e = await stdRes.json().catch(() => null); throw new Error(e?.message || `Error ${stdRes.status}`); }
-
-                const stdData = await stdRes.json();
-                state.results.set(state.currentIndex, stdData);
-                updateThumbnailBadge(state.currentIndex, stdData.totalProblemsFound);
-
-                if (mapRes.ok) {
-                    const mapData = await mapRes.json();
-                    state.mappedResults.set(state.currentIndex, mapData);
-                }
-
-                // Render based on current mode
-                if (state.useMapped && state.mappedResults.has(state.currentIndex)) {
-                    renderMappedResults(state.mappedResults.get(state.currentIndex));
-                    drawDetections(extractDetectionsFromMapped(state.mappedResults.get(state.currentIndex)));
-                } else {
-                    renderResults(stdData);
-                    drawDetections(stdData.detections);
-                }
-
-                showToast(stdData.totalProblemsFound > 0 ? 'success' : 'info',
-                    stdData.totalProblemsFound > 0
-                        ? `Found ${stdData.totalProblemsFound} defect(s) in ${stdData.processingTimeMs}ms`
-                        : 'No defects detected.');
-            } catch (err) { showToast('error', err.message); renderError(err.message); }
-            finally { setProcessing(false); stopScan(); }
-        }
-
-        function createFormData(file) {
+        function buildFormData(file) {
             const fd = new FormData();
             fd.append('image', file);
             fd.append('confidence', getConfidenceValue());
@@ -2572,13 +2874,141 @@
         }
 
         /* ============================================================
+           DETECT BUTTON ROUTER
+           ============================================================ */
+        function handleDetectClick() {
+            if (state.mode === 'video') detectVideo();
+            else detectSingle();
+        }
+
+        /* ============================================================
+           DETECT SINGLE IMAGE
+           ============================================================ */
+        async function detectSingle() {
+            if (!state.files.length || state.isProcessing) return;
+            const file = state.files[state.currentIndex];
+            const index = state.currentIndex;
+
+            setProcessing(true, 'image');
+            startScan();
+
+            const controller = newAbortController();
+
+            try {
+                // Only call the endpoint needed for the current output mode.
+                // The other result is fetched lazily when the user switches modes.
+                const endpoint = state.useMapped
+                    ? '/api/detection/detect-mapped'
+                    : '/api/detection/detect';
+
+                const res = await fetch(endpoint, {
+                    method: 'POST',
+                    body: buildFormData(file),
+                    signal: controller.signal
+                });
+
+                if (!res.ok) {
+                    const e = await res.json().catch(() => null);
+                    throw new Error(e?.message || `Server error ${res.status}`);
+                }
+
+                const data = await res.json();
+
+                if (state.useMapped) {
+                    state.mappedResults.set(index, data);
+                    // Also save a synthetic standard result for badge / export
+                    state.results.set(index, {
+                        success: data.success,
+                        message: data.message,
+                        imageName: data.imageName,
+                        totalProblemsFound: data.totalProblemsFound,
+                        processingTimeMs: data.processingTimeMs,
+                        detections: data.detections.map(d => ({
+                            problem: d.internalClassName,
+                            confidence: d.confidence,
+                            modelSource: d.modelSource,
+                            box: d.box,
+                            classIndex: d.internalClassIndex,
+                            modelId: d.modelId
+                        }))
+                    });
+                    renderMappedResults(data);
+                    drawDetections(extractDetectionsFromMapped(data));
+                } else {
+                    state.results.set(index, data);
+                    renderResults(data);
+                    drawDetections(data.detections);
+                }
+
+                updateThumbnailBadge(index, data.totalProblemsFound);
+
+                const count = data.totalProblemsFound;
+                showToast(
+                    count > 0 ? 'success' : 'info',
+                    count > 0
+                        ? `Found ${count} defect(s) in ${data.processingTimeMs}ms`
+                        : 'No defects detected.'
+                );
+            } catch (err) {
+                if (err.name === 'AbortError') {
+                    showToast('info', 'Detection cancelled.');
+                    clearResults();
+                } else {
+                    showToast('error', err.message);
+                    renderError(err.message, 'image');
+                }
+            } finally {
+                setProcessing(false);
+                stopScan();
+            }
+        }
+
+        /* ============================================================
            DETECT VIDEO
            ============================================================ */
+        let _elapsedTimerId = null;
+
+        function startElapsedTimer() {
+            const startMs = Date.now();
+            _elapsedTimerId = setInterval(() => {
+                const secs = ((Date.now() - startMs) / 1000).toFixed(0);
+                const el = $('videoProgressElapsed');
+                if (el) el.textContent = `Elapsed: ${secs}s`;
+            }, 1000);
+        }
+
+        function stopElapsedTimer() {
+            if (_elapsedTimerId) { clearInterval(_elapsedTimerId); _elapsedTimerId = null; }
+            const el = $('videoProgressElapsed');
+            if (el) el.textContent = '';
+        }
+
         async function detectVideo() {
             if (!state.videoFile || state.isProcessing) return;
-            setProcessing(true);
-            const progress = $('videoProgress'), fill = $('videoProgressFill'), text = $('videoProgressText');
-            progress.classList.add('visible'); fill.style.width = '0%'; text.textContent = 'Uploading video...';
+
+            // Check OpenCV availability before submitting
+            if (state.opencvAvailable === false) {
+                showToast('error',
+                    'OpenCV video pipeline is unavailable. ' +
+                    'Ensure the OpenCvSharp4 runtime package is installed on the server.');
+                return;
+            }
+
+            setProcessing(true, 'video');
+
+            const progressEl = $('videoProgress');
+            const progressBar = $('videoProgressBar');
+            const fillEl = $('videoProgressFill');
+            const textEl = $('videoProgressText');
+
+            progressEl.classList.add('visible');
+            progressBar.classList.add('indeterminate');   // animated indeterminate bar
+            fillEl.style.width = '0%';
+            textEl.textContent = 'Uploading video…';
+            startElapsedTimer();
+
+            const controller = newAbortController();
+
             try {
                 const fd = new FormData();
                 fd.append('video', state.videoFile);
@@ -2586,196 +3016,338 @@
                 fd.append('frameInterval', $('frameIntervalInput').value || '30');
                 fd.append('maxFrames', $('maxFramesInput').value || '120');
 
-                text.textContent = 'Processing video (this may take a while)...';
-                fill.style.width = '30%';
+                textEl.textContent = 'Processing video with OpenCV pipeline…';
 
-                const res = await fetch('/api/videodetection/detect', { method: 'POST', body: fd });
-                fill.style.width = '90%';
-                if (!res.ok) { const e = await res.json().catch(() => null); throw new Error(e?.message || `Error ${res.status}`); }
+                const res = await fetch('/api/videodetection/detect', {
+                    method: 'POST',
+                    body: fd,
+                    signal: controller.signal
+                });
+
+                // Switch to determinate bar once response arrives
+                progressBar.classList.remove('indeterminate');
+                fillEl.style.width = '95%';
+
+                if (!res.ok) {
+                    const e = await res.json().catch(() => null);
+                    throw new Error(e?.message || `Server error ${res.status}`);
+                }
 
                 const data = await res.json();
                 state.videoResult = data;
-                fill.style.width = '100%'; text.textContent = 'Complete!';
 
+                fillEl.style.width = '100%';
+                textEl.textContent = 'Complete!';
+
+                // Show annotated video if available
                 if (data.annotatedVideoUrl) {
+                    const prevSrc = videoPlayer.src;
+                    try { URL.revokeObjectURL(prevSrc); } catch (_) { }
+
                     videoPlayer.src = data.annotatedVideoUrl;
                     videoPlayer.style.display = 'block';
                     canvas.style.display = 'none';
                     canvasPlaceholder.style.display = 'none';
                     $('zoomControls').style.display = 'none';
-                    $('previewTitle').textContent = '🎬 Annotated Video';
+                    $('previewTitle').textContent = '🎬 Annotated Video (OpenCV)';
                     showToast('success', 'Annotated video ready!');
                 }
 
                 renderVideoResults(data);
 
-                const defects = data.totalUniqueDefects || data.totalDefectsFound || 0;
-                showToast(defects > 0 ? 'success' : 'info',
+                const defects = data.totalUniqueDefects ?? 0;
+                showToast(
+                    defects > 0 ? 'success' : 'info',
                     defects > 0
-                        ? `Found ${defects} unique defect(s) across ${data.framesWithDefects} frames in ${(data.processingTimeMs / 1000).toFixed(1)}s`
-                        : 'No defects detected.');
+                        ? `Found ${defects} unique defect(s) across ${data.framesWithDefects} frame(s) ` +
+                        `in ${(data.processingTimeMs / 1000).toFixed(1)}s`
+                        : `No defects in ${data.framesAnalyzed} analyzed frame(s).`
+                );
 
-                setTimeout(() => progress.classList.remove('visible'), 2000);
+                setTimeout(() => progressEl.classList.remove('visible'), 2500);
+
             } catch (err) {
-                showToast('error', err.message); renderError(err.message);
-                progress.classList.remove('visible');
-            } finally { setProcessing(false); }
+                progressBar.classList.remove('indeterminate');
+                progressEl.classList.remove('visible');
+
+                if (err.name === 'AbortError') {
+                    showToast('info', 'Video detection cancelled.');
+                    clearResults();
+                } else {
+                    showToast('error', err.message);
+                    renderError(err.message, 'video');
+                }
+            } finally {
+                setProcessing(false);
+                stopElapsedTimer();
+            }
         }
 
         /* ============================================================
-           DETECT ALL (Batch)
+           DETECT ALL (BATCH)
            ============================================================ */
         async function detectAll() {
             if (state.files.length < 2 || state.isProcessing) return;
-            setProcessing(true);
-            const progress = $('batchProgress'), fill = $('progressFill'), text = $('progressText');
+            setProcessing(true, 'image');
+
+            const progress = $('batchProgress');
+            const fill = $('progressFill');
+            const text = $('progressText');
             progress.classList.add('visible');
+
+            const controller = newAbortController();
+
             try {
                 for (let i = 0; i < state.files.length; i++) {
-                    fill.style.width = (i / state.files.length * 100) + '%';
-                    text.textContent = `Processing ${i + 1} of ${state.files.length}...`;
-                    switchImage(i); startScan();
+                    // Respect cancellation between images
+                    if (controller.signal.aborted) break;
 
-                    const [stdRes, mapRes] = await Promise.all([
-                        fetch('/api/detection/detect', { method: 'POST', body: createFormData(state.files[i]) }),
-                        fetch('/api/detection/detect-mapped', { method: 'POST', body: createFormData(state.files[i]) })
-                    ]);
+                    fill.style.width = ((i / state.files.length) * 100) + '%';
+                    text.textContent = `Processing ${i + 1} of ${state.files.length}…`;
 
-                    if (!stdRes.ok) { const e = await stdRes.json().catch(() => null); throw new Error(e?.message || `Error on image ${i + 1}`); }
+                    switchImage(i);
+                    startScan();
 
-                    const stdData = await stdRes.json();
-                    state.results.set(i, stdData);
-                    updateThumbnailBadge(i, stdData.totalProblemsFound);
+                    const endpoint = state.useMapped
+                        ? '/api/detection/detect-mapped'
+                        : '/api/detection/detect';
 
-                    if (mapRes.ok) {
-                        const mapData = await mapRes.json();
-                        state.mappedResults.set(i, mapData);
+                    const res = await fetch(endpoint, {
+                        method: 'POST',
+                        body: buildFormData(state.files[i]),
+                        signal: controller.signal
+                    });
+
+                    stopScan();
+
+                    if (!res.ok) {
+                        const e = await res.json().catch(() => null);
+                        showToast('warning', `Image ${i + 1}: ${e?.message || 'detection failed'}`);
+                        continue;
                     }
+
+                    const data = await res.json();
+
+                    if (state.useMapped) {
+                        state.mappedResults.set(i, data);
+                    } else {
+                        state.results.set(i, data);
+                    }
+
+                    updateThumbnailBadge(i, data.totalProblemsFound);
 
                     if (i === state.currentIndex) {
-                        if (state.useMapped && state.mappedResults.has(i)) {
-                            renderMappedResults(state.mappedResults.get(i));
-                            drawDetections(extractDetectionsFromMapped(state.mappedResults.get(i)));
+                        if (state.useMapped) {
+                            renderMappedResults(data);
+                            drawDetections(extractDetectionsFromMapped(data));
                         } else {
-                            renderResults(stdData);
-                            drawDetections(stdData.detections);
+                            renderResults(data);
+                            drawDetections(data.detections);
                         }
                     }
-                    stopScan();
                 }
-                fill.style.width = '100%'; text.textContent = 'All images processed!';
-                const total = Array.from(state.results.values()).reduce((s, r) => s + r.totalProblemsFound, 0);
-                showToast('success', `Batch complete! ${total} total defect(s).`);
-                setTimeout(() => progress.classList.remove('visible'), 2000);
-            } catch (err) { showToast('error', err.message); stopScan(); }
-            finally { setProcessing(false); }
+
+                if (!controller.signal.aborted) {
+                    fill.style.width = '100%';
+                    text.textContent = 'All images processed!';
+                    const total = Array.from(state.results.values())
+                        .reduce((s, r) => s + (r.totalProblemsFound ?? 0), 0);
+                    showToast('success', `Batch complete! ${total} total defect(s).`);
+                    setTimeout(() => progress.classList.remove('visible'), 2000);
+                } else {
+                    text.textContent = 'Cancelled.';
+                    setTimeout(() => progress.classList.remove('visible'), 1500);
+                }
+            } catch (err) {
+                stopScan();
+                if (err.name !== 'AbortError') {
+                    showToast('error', err.message);
+                }
+                progress.classList.remove('visible');
+            } finally {
+                setProcessing(false);
+            }
         }
 
         /* ============================================================
-           PROCESSING HELPERS
+           PROCESSING STATE HELPERS
            ============================================================ */
-        function setProcessing(p) {
+        function setProcessing(p, mode = 'image') {
             state.isProcessing = p;
             detectBtn.classList.toggle('loading', p);
             detectAllBtn.classList.toggle('loading', p);
             updateButtons();
-            if (p) showSkeleton();
+            if (p && mode === 'image') showSkeleton();
         }
+
         function startScan() { scanLine.classList.add('active'); }
         function stopScan() { scanLine.classList.remove('active'); }
 
         /* ============================================================
-           IMAGE RESULTS RENDERING (Standard)
+           RESULTS RENDERING — IMAGE (Standard)
            ============================================================ */
         function clearResults() {
-            resultsBody.innerHTML = '<div class="no-detections"><span class="no-detections-icon">📋</span><span class="no-detections-sub">Results will appear here after detection</span></div>';
+            resultsBody.innerHTML =
+                '<div class="no-detections">' +
+                '<span class="no-detections-icon">📋</span>' +
+                '<span class="no-detections-sub">Results will appear here after detection</span>' +
+                '</div>';
             exportBtnEl.style.display = 'none';
         }
+
         function showSkeleton() {
-            resultsBody.innerHTML = '<div class="summary-grid"><div class="skeleton skeleton-stat"></div><div class="skeleton skeleton-stat"></div></div><div class="skeleton skeleton-card"></div><div class="skeleton skeleton-card"></div>';
+            resultsBody.innerHTML =
+                '<div class="summary-grid">' +
+                '<div class="skeleton skeleton-stat"></div>' +
+                '<div class="skeleton skeleton-stat"></div>' +
+                '</div>' +
+                '<div class="skeleton skeleton-card"></div>' +
+                '<div class="skeleton skeleton-card"></div>';
         }
-        function renderError(msg) {
-            resultsBody.innerHTML = `<div class="no-detections"><span class="no-detections-icon">❌</span><span class="no-detections-text" style="color:var(--danger);">Detection Failed</span><span class="no-detections-sub">${msg || 'An error occurred.'}</span><button class="btn btn-secondary" onclick="detectSingle()" style="margin-top:10px;flex:none;width:auto;padding:8px 20px;">🔄 Retry</button></div>`;
+
+        function renderError(msg, mode = 'image') {
+            const retryFn = mode === 'video' ? 'detectVideo()' : 'detectSingle()';
+            resultsBody.innerHTML =
+                `<div class="no-detections">
+                <span class="no-detections-icon">❌</span>
+                <span class="no-detections-text" style="color:var(--danger);">Detection Failed</span>
+                <span class="no-detections-sub">${escHtml(msg || 'An error occurred.')}</span>
+                <button class="btn btn-secondary" onclick="${retryFn}"
+                        style="margin-top:10px;flex:none;width:auto;padding:8px 20px;">
+                    🔄 Retry
+                </button>
+            </div>`;
         }
 
         function renderResults(data) {
-            if (!data.success) { renderError(data.message); return; }
+            if (!data.success) { renderError(data.message, 'image'); return; }
+
             let html = `<div class="summary-grid">
-                    <div class="stat-card"><div class="stat-value ${data.totalProblemsFound > 0 ? 'danger' : 'success-color'}" id="defectCount">0</div><div class="stat-label">Defects Found</div></div>
-                    <div class="stat-card"><div class="stat-value">${data.processingTimeMs}ms</div><div class="stat-label">Processing Time</div></div></div>`;
+            <div class="stat-card">
+                <div class="stat-value ${data.totalProblemsFound > 0 ? 'danger' : 'success-color'}"
+                     id="defectCount">0</div>
+                <div class="stat-label">Defects Found</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">${data.processingTimeMs}ms</div>
+                <div class="stat-label">Processing Time</div>
+            </div>
+        </div>`;
 
             if (state.currentImage) {
-                const modelSources = data.detections.length > 0
+                const sources = data.detections?.length
                     ? [...new Set(data.detections.map(d => d.modelSource))].join(', ')
                     : 'N/A';
-                html += `<div style="font-size:11px;color:var(--text-dim);margin-bottom:8px;display:flex;justify-content:space-between;">
-                        <span>📐 ${state.currentImage.naturalWidth} × ${state.currentImage.naturalHeight}px</span>
-                        <span>🤖 ${modelSources}</span></div>`;
+                html += `<div style="font-size:11px;color:var(--text-dim);margin-bottom:8px;
+                                  display:flex;justify-content:space-between;">
+                <span>📐 ${state.currentImage.naturalWidth} × ${state.currentImage.naturalHeight}px</span>
+                <span>🤖 ${escHtml(sources)}</span>
+            </div>`;
             }
 
-            if (!data.detections.length) {
-                html += '<div class="no-detections"><span class="no-detections-icon">✅</span><span class="no-detections-text">No defects detected</span><span class="no-detections-sub">Road surface appears in good condition.</span></div>';
+            if (!data.detections?.length) {
+                html += `<div class="no-detections">
+                <span class="no-detections-icon">✅</span>
+                <span class="no-detections-text">No defects detected</span>
+                <span class="no-detections-sub">Road surface appears in good condition.</span>
+            </div>`;
             } else {
                 data.detections.forEach((det, i) => {
                     const pct = Math.round(det.confidence * 100);
                     const color = getConfidenceHex(det.confidence);
                     const delay = (i * 0.08).toFixed(2);
-                    html += `<div class="detection-card" style="animation-delay:${delay}s;" onclick="toggleCoords(this)" onmouseenter="highlightBox(${i})" onmouseleave="unhighlightBox()">
-                            <div class="detection-card-header">
-                                <div class="detection-problem">
-                                    <span class="detection-index" style="background:${color}22;color:${color};">${i + 1}</span>${det.problem}
-                                </div>
-                                <span class="detection-confidence-text" style="color:${color};">${pct}%</span>
-                            </div>
-                            <div class="confidence-bar"><div class="confidence-fill" style="background:${color};" data-width="${pct}"></div></div>
-                            <div class="detection-meta">
-                                <span>🤖 ${det.modelSource}</span>
-                                <span>${pct >= 70 ? '🟢 High' : pct >= 40 ? '🟡 Medium' : '🔴 Low'}</span>
-                            </div>
-                            <div style="display:flex;gap:4px;margin-top:4px;">
-                                <span class="mapping-badge model-id">Model #${det.modelId}</span>
-                                <span class="mapping-badge model-id">Class #${det.classIndex}</span>
-                            </div>
-                            <div class="detection-coords">x:${det.box.x.toFixed(1)}, y:${det.box.y.toFixed(1)}, w:${det.box.width.toFixed(1)}, h:${det.box.height.toFixed(1)}</div>
-                        </div>`;
+                    html += `<div class="detection-card" style="animation-delay:${delay}s;"
+                              onclick="toggleCoords(this)"
+                              onmouseenter="highlightBox(${i})"
+                              onmouseleave="unhighlightBox()">
+                    <div class="detection-card-header">
+                        <div class="detection-problem">
+                            <span class="detection-index"
+                                  style="background:${color}22;color:${color};">${i + 1}</span>
+                            ${escHtml(det.problem)}
+                        </div>
+                        <span class="detection-confidence-text" style="color:${color};">${pct}%</span>
+                    </div>
+                    <div class="confidence-bar">
+                        <div class="confidence-fill" style="background:${color};" data-width="${pct}"></div>
+                    </div>
+                    <div class="detection-meta">
+                        <span>🤖 ${escHtml(det.modelSource)}</span>
+                        <span>${pct >= 70 ? '🟢 High' : pct >= 40 ? '🟡 Medium' : '🔴 Low'}</span>
+                    </div>
+                    <div style="display:flex;gap:4px;margin-top:4px;">
+                        <span class="mapping-badge model-id">Model #${det.modelId}</span>
+                        <span class="mapping-badge model-id">Class #${det.classIndex}</span>
+                    </div>
+                    <div class="detection-coords">
+                        x:${det.box.x.toFixed(1)}, y:${det.box.y.toFixed(1)},
+                        w:${det.box.width.toFixed(1)}, h:${det.box.height.toFixed(1)}
+                    </div>
+                </div>`;
                 });
             }
+
             resultsBody.innerHTML = html;
-            exportBtnEl.style.display = data.detections.length > 0 ? 'flex' : 'none';
+            exportBtnEl.style.display = (data.detections?.length > 0) ? 'flex' : 'none';
             animateCount('defectCount', data.totalProblemsFound);
             requestAnimationFrame(() => {
-                document.querySelectorAll('.confidence-fill[data-width]').forEach(el => el.style.width = el.dataset.width + '%');
+                document.querySelectorAll('.confidence-fill[data-width]').forEach(el => {
+                    el.style.width = el.dataset.width + '%';
+                });
             });
         }
 
         /* ============================================================
-           MAPPED RESULTS RENDERING (External System)
+           RESULTS RENDERING — IMAGE (Mapped)
            ============================================================ */
         function renderMappedResults(data) {
-            if (!data.success) { renderError(data.message); return; }
+            if (!data.success) { renderError(data.message, 'image'); return; }
 
             let html = `<div class="summary-grid">
-                    <div class="stat-card"><div class="stat-value ${data.totalProblemsFound > 0 ? 'danger' : 'success-color'}" id="defectCount">0</div><div class="stat-label">Defects Found</div></div>
-                    <div class="stat-card"><div class="stat-value">${data.processingTimeMs}ms</div><div class="stat-label">Processing Time</div></div>
-                    <div class="stat-card"><div class="stat-value" style="color:var(--purple);">${data.mappedDetections}</div><div class="stat-label">Mapped</div></div>
-                    <div class="stat-card"><div class="stat-value" style="color:${data.unmappedDetections > 0 ? 'var(--warning)' : 'var(--text-dim)'};">${data.unmappedDetections}</div><div class="stat-label">Unmapped</div></div></div>`;
+            <div class="stat-card">
+                <div class="stat-value ${data.totalProblemsFound > 0 ? 'danger' : 'success-color'}"
+                     id="defectCount">0</div>
+                <div class="stat-label">Defects Found</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">${data.processingTimeMs}ms</div>
+                <div class="stat-label">Processing Time</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" style="color:var(--purple);">${data.mappedDetections}</div>
+                <div class="stat-label">Mapped</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" style="color:${data.unmappedDetections > 0 ? 'var(--warning)' : 'var(--text-dim)'};">
+                    ${data.unmappedDetections}
+                </div>
+                <div class="stat-label">Unmapped</div>
+            </div>
+        </div>`;
 
-            // Mapped mode indicator
-            html += `<div style="font-size:11px;color:var(--purple);text-align:center;padding:6px;margin-bottom:8px;
-                    background:rgba(168,85,247,0.06);border-radius:var(--radius-sm);border:1px solid rgba(168,85,247,0.15);">
-                    📡 External System Mapped Output</div>`;
+            html += `<div style="font-size:11px;color:var(--purple);text-align:center;padding:6px;
+                    margin-bottom:8px;background:rgba(168,85,247,0.06);border-radius:var(--radius-sm);
+                    border:1px solid rgba(168,85,247,0.15);">
+            📡 External System Mapped Output
+        </div>`;
 
             if (state.currentImage) {
-                const modelSources = data.detections.length > 0
+                const sources = data.detections?.length
                     ? [...new Set(data.detections.map(d => d.modelSource))].join(', ')
                     : 'N/A';
-                html += `<div style="font-size:11px;color:var(--text-dim);margin-bottom:8px;display:flex;justify-content:space-between;">
-                        <span>📐 ${state.currentImage.naturalWidth} × ${state.currentImage.naturalHeight}px</span>
-                        <span>🤖 ${modelSources}</span></div>`;
+                html += `<div style="font-size:11px;color:var(--text-dim);margin-bottom:8px;
+                                  display:flex;justify-content:space-between;">
+                <span>📐 ${state.currentImage.naturalWidth} × ${state.currentImage.naturalHeight}px</span>
+                <span>🤖 ${escHtml(sources)}</span>
+            </div>`;
             }
 
-            if (!data.detections.length) {
-                html += '<div class="no-detections"><span class="no-detections-icon">✅</span><span class="no-detections-text">No defects detected</span><span class="no-detections-sub">Road surface appears in good condition.</span></div>';
+            if (!data.detections?.length) {
+                html += `<div class="no-detections">
+                <span class="no-detections-icon">✅</span>
+                <span class="no-detections-text">No defects detected</span>
+                <span class="no-detections-sub">Road surface appears in good condition.</span>
+            </div>`;
             } else {
                 data.detections.forEach((det, i) => {
                     const pct = Math.round(det.confidence * 100);
@@ -2784,177 +3356,283 @@
                     const displayName = det.externalClassName || det.internalClassName;
                     const hasMapped = det.hasExternalMapping;
 
-                    html += `<div class="detection-card" style="animation-delay:${delay}s;" onclick="toggleCoords(this)" onmouseenter="highlightMappedBox(${i})" onmouseleave="unhighlightMappedBox()">
-                            <div class="detection-card-header">
-                                <div class="detection-problem">
-                                    <span class="detection-index" style="background:${color}22;color:${color};">${i + 1}</span>${displayName}
-                                </div>
-                                <span class="detection-confidence-text" style="color:${color};">${pct}%</span>
-                            </div>
-                            <div class="confidence-bar"><div class="confidence-fill" style="background:${color};" data-width="${pct}"></div></div>
-                            <div class="detection-meta">
-                                <span>🤖 ${det.modelSource}</span>
-                                <span>${pct >= 70 ? '🟢 High' : pct >= 40 ? '🟡 Medium' : '🔴 Low'}</span>
-                            </div>
-                            <div class="mapping-info">`;
+                    html += `<div class="detection-card" style="animation-delay:${delay}s;"
+                              onclick="toggleCoords(this)"
+                              onmouseenter="highlightMappedBox(${i})"
+                              onmouseleave="unhighlightMappedBox()">
+                    <div class="detection-card-header">
+                        <div class="detection-problem">
+                            <span class="detection-index"
+                                  style="background:${color}22;color:${color};">${i + 1}</span>
+                            ${escHtml(displayName)}
+                        </div>
+                        <span class="detection-confidence-text" style="color:${color};">${pct}%</span>
+                    </div>
+                    <div class="confidence-bar">
+                        <div class="confidence-fill" style="background:${color};" data-width="${pct}"></div>
+                    </div>
+                    <div class="detection-meta">
+                        <span>🤖 ${escHtml(det.modelSource)}</span>
+                        <span>${pct >= 70 ? '🟢 High' : pct >= 40 ? '🟡 Medium' : '🔴 Low'}</span>
+                    </div>
+                    <div class="mapping-info">`;
 
                     if (hasMapped) {
+                        const sevClass = det.severity
+                            ? `severity-${det.severity.toLowerCase()}`
+                            : '';
                         html += `<span class="mapping-badge external">ExtID: ${det.externalClassId}</span>`;
-                        if (det.severity) {
-                            const sevClass = det.severity.toLowerCase() === 'high' ? 'severity-high'
-                                : det.severity.toLowerCase() === 'medium' ? 'severity-medium' : 'severity-low';
-                            html += `<span class="mapping-badge ${sevClass}">${det.severity}</span>`;
-                        }
-                        if (det.category) {
-                            html += `<span class="mapping-badge category">${det.category}</span>`;
-                        }
-                        html += `<span class="mapping-badge model-id">Model #${det.modelId} / Class #${det.internalClassIndex}</span>`;
-                        if (det.internalClassName !== det.externalClassName) {
-                            html += `<span class="mapping-badge unmapped" title="Internal name">🏷️ ${det.internalClassName}</span>`;
-                        }
+                        if (det.severity)
+                            html += `<span class="mapping-badge ${sevClass}">${escHtml(det.severity)}</span>`;
+                        if (det.category)
+                            html += `<span class="mapping-badge category">${escHtml(det.category)}</span>`;
+                        html += `<span class="mapping-badge model-id">
+                                Model #${det.modelId} / Class #${det.internalClassIndex}
+                             </span>`;
+                        if (det.internalClassName !== det.externalClassName)
+                            html += `<span class="mapping-badge unmapped" title="Internal name">
+                                    🏷️ ${escHtml(det.internalClassName)}
+                                 </span>`;
                     } else {
-                        html += `<span class="mapping-badge unmapped">⚠️ No external mapping</span>`;
-                        html += `<span class="mapping-badge model-id">Model #${det.modelId} / Class #${det.internalClassIndex}</span>`;
+                        html += `<span class="mapping-badge unmapped">⚠️ No external mapping</span>
+                             <span class="mapping-badge model-id">
+                                Model #${det.modelId} / Class #${det.internalClassIndex}
+                             </span>`;
                     }
 
                     html += `</div>
-                            <div class="detection-coords">x:${det.box.x.toFixed(1)}, y:${det.box.y.toFixed(1)}, w:${det.box.width.toFixed(1)}, h:${det.box.height.toFixed(1)}</div>
-                        </div>`;
+                    <div class="detection-coords">
+                        x:${det.box.x.toFixed(1)}, y:${det.box.y.toFixed(1)},
+                        w:${det.box.width.toFixed(1)}, h:${det.box.height.toFixed(1)}
+                    </div>
+                </div>`;
                 });
             }
+
             resultsBody.innerHTML = html;
-            exportBtnEl.style.display = data.detections.length > 0 ? 'flex' : 'none';
+            exportBtnEl.style.display = (data.detections?.length > 0) ? 'flex' : 'none';
             animateCount('defectCount', data.totalProblemsFound);
             requestAnimationFrame(() => {
-                document.querySelectorAll('.confidence-fill[data-width]').forEach(el => el.style.width = el.dataset.width + '%');
+                document.querySelectorAll('.confidence-fill[data-width]').forEach(el => {
+                    el.style.width = el.dataset.width + '%';
+                });
             });
         }
 
         function highlightMappedBox(index) {
             if (!state.mappedResults.has(state.currentIndex)) return;
-            const data = state.mappedResults.get(state.currentIndex);
-            const dets = extractDetectionsFromMapped(data);
+            const dets = extractDetectionsFromMapped(state.mappedResults.get(state.currentIndex));
             drawDetections(dets, index);
-            document.querySelectorAll('.detection-card').forEach((c, i) => c.classList.toggle('highlighted', i === index));
+            document.querySelectorAll('.detection-card')
+                .forEach((c, i) => c.classList.toggle('highlighted', i === index));
         }
         function unhighlightMappedBox() {
             if (!state.mappedResults.has(state.currentIndex)) return;
-            const data = state.mappedResults.get(state.currentIndex);
-            const dets = extractDetectionsFromMapped(data);
+            const dets = extractDetectionsFromMapped(state.mappedResults.get(state.currentIndex));
             drawDetections(dets, -1);
             document.querySelectorAll('.detection-card').forEach(c => c.classList.remove('highlighted'));
         }
 
         /* ============================================================
-           VIDEO RESULTS RENDERING
+           RESULTS RENDERING — VIDEO
            ============================================================ */
         function renderVideoResults(data) {
-            if (!data.success) { renderError(data.message); return; }
-            const uniqueCount = data.totalUniqueDefects || data.totalDefectsFound || 0;
-            const rawCount = data.totalRawDetections || uniqueCount;
+            if (!data.success) { renderError(data.message, 'video'); return; }
+
+            // Use totalUniqueDefects — the TotalDefectsFound alias was removed from the backend
+            const uniqueCount = data.totalUniqueDefects ?? 0;
+            const rawCount = data.totalRawDetections ?? uniqueCount;
 
             let html = '';
 
+            // Video metadata grid
             html += `<div class="video-info-grid">
-                    <div class="video-info-item"><div class="video-info-value">${data.videoDuration}</div><div class="video-info-label">Duration</div></div>
-                    <div class="video-info-item"><div class="video-info-value">${data.videoFps}fps</div><div class="video-info-label">Frame Rate</div></div>
-                    <div class="video-info-item"><div class="video-info-value">${data.videoWidth}×${data.videoHeight}</div><div class="video-info-label">Resolution</div></div></div>`;
+            <div class="video-info-item">
+                <div class="video-info-value">${escHtml(data.videoDuration)}</div>
+                <div class="video-info-label">Duration</div>
+            </div>
+            <div class="video-info-item">
+                <div class="video-info-value">${data.videoFps}fps</div>
+                <div class="video-info-label">Frame Rate</div>
+            </div>
+            <div class="video-info-item">
+                <div class="video-info-value">${data.videoWidth}×${data.videoHeight}</div>
+                <div class="video-info-label">Resolution</div>
+            </div>
+        </div>`;
 
+            // OpenCV pipeline badge
+            html += `<div style="font-size:11px;color:var(--success);text-align:center;padding:5px;
+                    margin-bottom:8px;background:rgba(0,255,136,0.05);border-radius:var(--radius-sm);
+                    border:1px solid rgba(0,255,136,0.15);">
+            ⚙️ Processed by OpenCV pipeline ·
+            Every ${data.frameIntervalUsed}th frame · ${data.framesAnalyzed} frames analyzed
+        </div>`;
+
+            // Summary stats
             html += `<div class="summary-grid">
-                    <div class="stat-card"><div class="stat-value ${uniqueCount > 0 ? 'danger' : 'success-color'}" id="defectCount">0</div><div class="stat-label">Unique Defects</div></div>
-                    <div class="stat-card"><div class="stat-value">${rawCount}</div><div class="stat-label">Raw Detections</div></div>
-                    <div class="stat-card"><div class="stat-value ${data.framesWithDefects > 0 ? 'danger' : 'success-color'}">${data.framesWithDefects}</div><div class="stat-label">Frames w/ Defects</div></div>
-                    <div class="stat-card"><div class="stat-value">${(data.processingTimeMs / 1000).toFixed(1)}s</div><div class="stat-label">Total Time</div></div></div>`;
+            <div class="stat-card">
+                <div class="stat-value ${uniqueCount > 0 ? 'danger' : 'success-color'}"
+                     id="defectCount">0</div>
+                <div class="stat-label">Unique Defects</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">${rawCount}</div>
+                <div class="stat-label">Raw Detections</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value ${data.framesWithDefects > 0 ? 'danger' : 'success-color'}">
+                    ${data.framesWithDefects}
+                </div>
+                <div class="stat-label">Frames w/ Defects</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">${(data.processingTimeMs / 1000).toFixed(1)}s</div>
+                <div class="stat-label">Total Time</div>
+            </div>
+        </div>`;
 
-            if (rawCount > uniqueCount) {
-                const eliminated = rawCount - uniqueCount;
-                const pct = ((eliminated / rawCount) * 100).toFixed(0);
-                html += `<div style="font-size:12px;color:var(--text-secondary);text-align:center;padding:8px;margin-bottom:8px;background:rgba(0,212,255,0.05);border-radius:var(--radius-sm);border:1px solid var(--accent-dim);">
-                        🎯 Tracking eliminated <strong>${eliminated}</strong> duplicate(s) (${pct}% reduction)</div>`;
+            if (rawCount > uniqueCount && uniqueCount > 0) {
+                const elim = rawCount - uniqueCount;
+                const pct = ((elim / rawCount) * 100).toFixed(0);
+                html += `<div style="font-size:12px;color:var(--text-secondary);text-align:center;
+                        padding:8px;margin-bottom:8px;background:rgba(0,212,255,0.05);
+                        border-radius:var(--radius-sm);border:1px solid var(--accent-dim);">
+                🎯 Tracking eliminated <strong>${elim}</strong> duplicate(s) (${pct}% reduction)
+            </div>`;
             }
 
             if (data.annotatedVideoUrl) {
-                html += `<a href="${data.annotatedVideoUrl}" download class="download-video-btn">📥 Download Annotated Video</a>`;
+                html += `<a href="${escHtml(data.annotatedVideoUrl)}" download
+                        class="download-video-btn">
+                📥 Download Annotated Video
+            </a>`;
             }
 
+            // Tabs
             html += `<div class="result-tabs" style="margin-top:12px;">
-                    <button class="result-tab active" onclick="switchVideoTab('unique',this)">🎯 Unique (${uniqueCount})</button>
-                    <button class="result-tab" onclick="switchVideoTab('timeline',this)">🕐 Timeline (${data.frameResults?.length || 0})</button>
-                    <button class="result-tab" onclick="switchVideoTab('breakdown',this)">📊 Breakdown</button></div>`;
+            <button class="result-tab active"
+                    onclick="switchVideoTab('unique',this)">
+                🎯 Unique (${uniqueCount})
+            </button>
+            <button class="result-tab"
+                    onclick="switchVideoTab('timeline',this)">
+                🕐 Timeline (${data.frameResults?.length ?? 0})
+            </button>
+            <button class="result-tab"
+                    onclick="switchVideoTab('breakdown',this)">
+                📊 Breakdown
+            </button>
+        </div>`;
 
-            // Unique Defects Tab
+            // Tab: Unique defects
             html += '<div class="tab-content active" id="tab-unique">';
-            if (data.uniqueDefects && data.uniqueDefects.length > 0) {
+            if (data.uniqueDefects?.length > 0) {
                 data.uniqueDefects.forEach((ud, i) => {
                     const pct = Math.round(ud.bestConfidence * 100);
                     const color = getTrackColor(ud.trackId);
                     const delay = Math.min(i * 0.05, 0.8).toFixed(2);
-                    html += `<div class="unique-defect-card" style="animation-delay:${delay}s;border-left:3px solid ${color};" onclick="seekToTimestamp(${ud.bestTimestamp})">
-                            <div class="unique-defect-header">
-                                <div class="unique-defect-name">
-                                    <span class="track-badge" style="background:${color}22;color:${color};">#${ud.trackId}</span>
-                                    ${ud.defectClass}
-                                </div>
-                                <span style="font-size:13px;font-weight:600;color:${getConfidenceHex(ud.bestConfidence)};">${pct}%</span>
-                            </div>
-                            <div class="unique-defect-meta">
-                                <span>📍 First: ${formatTs(ud.firstSeenTimestamp)}</span>
-                                <span>📍 Last: ${formatTs(ud.lastSeenTimestamp)}</span>
-                                <span>👁️ ${ud.totalFrameAppearances} frame(s)</span>
-                                <span>🤖 ${ud.modelSource || 'N/A'}</span>
-                            </div></div>`;
+                    html += `<div class="unique-defect-card"
+                              style="animation-delay:${delay}s;border-left:3px solid ${color};"
+                              onclick="seekToTimestamp(${ud.bestTimestamp})">
+                    <div class="unique-defect-header">
+                        <div class="unique-defect-name">
+                            <span class="track-badge"
+                                  style="background:${color}22;color:${color};">#${ud.trackId}</span>
+                            ${escHtml(ud.defectClass)}
+                        </div>
+                        <span style="font-size:13px;font-weight:600;
+                                     color:${getConfidenceHex(ud.bestConfidence)};">${pct}%</span>
+                    </div>
+                    <div class="unique-defect-meta">
+                        <span>📍 First: ${formatTs(ud.firstSeenTimestamp)}</span>
+                        <span>📍 Last:  ${formatTs(ud.lastSeenTimestamp)}</span>
+                        <span>👁️ ${ud.totalFrameAppearances} frame(s)</span>
+                        <span>🤖 ${escHtml(ud.modelSource || 'N/A')}</span>
+                    </div>
+                </div>`;
                 });
             } else {
-                html += '<div class="no-detections"><span class="no-detections-icon">✅</span><span class="no-detections-text">No defects detected</span></div>';
+                html += `<div class="no-detections">
+                <span class="no-detections-icon">✅</span>
+                <span class="no-detections-text">No defects detected</span>
+            </div>`;
             }
             html += '</div>';
 
-            // Timeline Tab
+            // Tab: Timeline
             html += '<div class="tab-content" id="tab-timeline"><div class="frame-timeline">';
-            if (data.frameResults) {
+            if (data.frameResults?.length > 0) {
                 data.frameResults.forEach((frame, i) => {
                     const has = frame.defectsInFrame > 0;
                     const delay = Math.min(i * 0.03, 1).toFixed(2);
                     const defList = has
-                        ? frame.detections.map(d => d.problem).filter((v, idx, a) => a.indexOf(v) === idx).join(', ')
+                        ? frame.detections
+                            .map(d => d.problem)
+                            .filter((v, idx, a) => a.indexOf(v) === idx)
+                            .join(', ')
                         : 'No defects';
-                    let trackInfo = '';
-                    if (frame.trackIds && frame.trackIds.length > 0) {
-                        trackInfo = frame.trackIds.map(tid =>
-                            `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${getTrackColor(tid)};margin-right:2px;" title="Track #${tid}"></span>`
+
+                    let trackDots = '';
+                    if (frame.trackIds?.length > 0) {
+                        trackDots = frame.trackIds.map(tid =>
+                            `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;
+                                      background:${getTrackColor(tid)};margin-right:2px;"
+                               title="Track #${tid}"></span>`
                         ).join('');
                     }
-                    html += `<div class="frame-card ${has ? 'has-defects' : 'clean'}" style="animation-delay:${delay}s;" onclick="seekToTimestamp(${frame.timestampSeconds})">
-                            <span class="frame-timestamp">${frame.timestamp}</span>
-                            <div class="frame-info">
-                                <div class="frame-defect-count">Frame #${frame.frameNumber} ${trackInfo}</div>
-                                <div class="frame-defect-list">${defList}</div>
-                            </div>
-                            <span class="frame-badge ${has ? 'danger' : 'success'}">${has ? frame.defectsInFrame : '✓'}</span></div>`;
+
+                    html += `<div class="frame-card ${has ? 'has-defects' : 'clean'}"
+                              style="animation-delay:${delay}s;"
+                              onclick="seekToTimestamp(${frame.timestampSeconds})">
+                    <span class="frame-timestamp">${escHtml(frame.timestamp)}</span>
+                    <div class="frame-info">
+                        <div class="frame-defect-count">Frame #${frame.frameNumber} ${trackDots}</div>
+                        <div class="frame-defect-list">${escHtml(defList)}</div>
+                    </div>
+                    <span class="frame-badge ${has ? 'danger' : 'success'}">
+                        ${has ? frame.defectsInFrame : '✓'}
+                    </span>
+                </div>`;
                 });
+            } else {
+                html += '<div style="padding:20px;text-align:center;color:var(--text-dim);">No frame data available.</div>';
             }
             html += '</div></div>';
 
-            // Breakdown Tab
+            // Tab: Breakdown
             html += '<div class="tab-content" id="tab-breakdown">';
             const defSummary = data.defectSummary || {};
             if (Object.keys(defSummary).length > 0) {
-                html += '<div style="font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:6px;">Unique Defects by Type</div><div class="defect-summary">';
+                html += '<div style="font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:6px;">Unique Defects by Type</div>';
+                html += '<div class="defect-summary">';
                 for (const [name, count] of Object.entries(defSummary)) {
-                    html += `<div class="defect-summary-item"><span class="defect-summary-count">${count}</span><span class="defect-summary-name">${name}</span></div>`;
+                    html += `<div class="defect-summary-item">
+                    <span class="defect-summary-count">${count}</span>
+                    <span class="defect-summary-name">${escHtml(name)}</span>
+                </div>`;
                 }
                 html += '</div>';
             }
+
             const rawSummary = data.rawDefectSummary || {};
             if (Object.keys(rawSummary).length > 0) {
-                html += '<div style="font-size:12px;font-weight:600;color:var(--text-secondary);margin:8px 0 6px;">Raw Detections by Type (before tracking)</div><div class="defect-summary">';
+                html += '<div style="font-size:12px;font-weight:600;color:var(--text-secondary);margin:8px 0 6px;">Raw Detections by Type (before tracking)</div>';
+                html += '<div class="defect-summary">';
                 for (const [name, count] of Object.entries(rawSummary)) {
-                    html += `<div class="defect-summary-item"><span class="defect-summary-count" style="color:var(--text-secondary);">${count}</span><span class="defect-summary-name">${name}</span></div>`;
+                    html += `<div class="defect-summary-item">
+                    <span class="defect-summary-count" style="color:var(--text-secondary);">${count}</span>
+                    <span class="defect-summary-name">${escHtml(name)}</span>
+                </div>`;
                 }
                 html += '</div>';
             }
+
             html += `<div style="font-size:11px;color:var(--text-dim);margin-top:12px;text-align:center;">
-                    Avg ${data.avgTimePerFrameMs}ms/frame · Every ${data.frameIntervalUsed}th frame analyzed</div>`;
+            Avg ${data.avgTimePerFrameMs}ms/frame ·
+            Every ${data.frameIntervalUsed}th frame analyzed ·
+            OpenCV pipeline
+        </div>`;
             html += '</div>';
 
             resultsBody.innerHTML = html;
@@ -2975,14 +3653,15 @@
         }
 
         function seekToTimestamp(seconds) {
-            if (videoPlayer && videoPlayer.style.display !== 'none') {
+            if (videoPlayer && videoPlayer.style.display !== 'none' && videoPlayer.src) {
                 videoPlayer.currentTime = seconds;
-                videoPlayer.play();
+                videoPlayer.play().catch(() => { }); // Ignore autoplay policy errors gracefully
                 showToast('info', `Seeking to ${formatTs(seconds)}`);
             }
         }
 
         function formatTs(seconds) {
+            if (typeof seconds !== 'number' || isNaN(seconds)) return '00:00.0';
             const m = Math.floor(seconds / 60).toString().padStart(2, '0');
             const s = (seconds % 60).toFixed(1).padStart(4, '0');
             return `${m}:${s}`;
@@ -2992,10 +3671,12 @@
            INTERACTIONS
            ============================================================ */
         function toggleCoords(card) { card.classList.toggle('expanded'); }
+
         function highlightBox(index) {
             const data = state.results.get(state.currentIndex);
             if (data) drawDetections(data.detections, index);
-            document.querySelectorAll('.detection-card').forEach((c, i) => c.classList.toggle('highlighted', i === index));
+            document.querySelectorAll('.detection-card')
+                .forEach((c, i) => c.classList.toggle('highlighted', i === index));
         }
         function unhighlightBox() {
             const data = state.results.get(state.currentIndex);
@@ -3007,10 +3688,16 @@
            COUNT-UP ANIMATION
            ============================================================ */
         function animateCount(id, target) {
-            const el = $(id); if (!el) return;
-            if (target === 0) { el.textContent = '0'; return; }
-            let c = 0; const step = Math.max(1, Math.floor(target / 20));
-            const iv = setInterval(() => { c += step; if (c >= target) { c = target; clearInterval(iv); } el.textContent = c; }, 40);
+            const el = $(id);
+            if (!el) return;
+            if (!target || target === 0) { el.textContent = '0'; return; }
+            let c = 0;
+            const step = Math.max(1, Math.floor(target / 20));
+            const iv = setInterval(() => {
+                c += step;
+                if (c >= target) { c = target; clearInterval(iv); }
+                el.textContent = c;
+            }, 40);
         }
 
         /* ============================================================
@@ -3019,24 +3706,43 @@
         function exportReport() {
             let report;
             if (state.mode === 'video' && state.videoResult) {
-                report = { exportedAt: new Date().toISOString(), type: 'video', outputMode: state.useMapped ? 'mapped' : 'standard', videoResult: state.videoResult };
+                report = {
+                    exportedAt: new Date().toISOString(),
+                    type: 'video',
+                    pipeline: 'OpenCV',
+                    videoResult: state.videoResult
+                };
             } else {
                 const stdAll = {}, mapAll = {};
-                state.results.forEach((v, k) => { stdAll[state.files[k]?.name || `image_${k}`] = v; });
-                state.mappedResults.forEach((v, k) => { mapAll[state.files[k]?.name || `image_${k}`] = v; });
+                state.results.forEach((v, k) => {
+                    stdAll[state.files[k]?.name || `image_${k}`] = v;
+                });
+                // Only include mapped results that were actually fetched
+                state.mappedResults.forEach((v, k) => {
+                    mapAll[state.files[k]?.name || `image_${k}`] = v;
+                });
+
                 report = {
                     exportedAt: new Date().toISOString(),
                     type: 'image',
                     outputMode: state.useMapped ? 'mapped' : 'standard',
                     totalImages: state.results.size,
-                    totalDefects: Array.from(state.results.values()).reduce((s, r) => s + r.totalProblemsFound, 0),
+                    totalDefects: Array.from(state.results.values())
+                        .reduce((s, r) => s + (r.totalProblemsFound ?? 0), 0),
                     standardResults: stdAll,
-                    mappedResults: mapAll
+                    ...(Object.keys(mapAll).length > 0 && { mappedResults: mapAll })
                 };
             }
-            const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
-            const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-            a.download = `defect-report-${state.useMapped ? 'mapped-' : ''}${Date.now()}.json`; a.click();
+
+            const blob = new Blob(
+                [JSON.stringify(report, null, 2)],
+                { type: 'application/json' }
+            );
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `defect-report-${Date.now()}.json`;
+            a.click();
+            setTimeout(() => URL.revokeObjectURL(a.href), 1000);
             showToast('success', 'Report downloaded!');
         }
 
@@ -3044,19 +3750,49 @@
            CONFIDENCE SLIDER
            ============================================================ */
         function updateConfidenceDisplay() {
-            const v = parseInt($('confidenceSlider').value), d = $('confidenceDisplay');
+            const v = parseInt($('confidenceSlider').value);
+            const d = $('confidenceDisplay');
             d.textContent = v + '%';
-            if (v < 30) { d.style.color = 'var(--danger)'; d.style.borderColor = 'rgba(255,107,107,0.3)'; d.style.background = 'rgba(255,107,107,0.1)'; }
-            else if (v < 60) { d.style.color = 'var(--warning)'; d.style.borderColor = 'rgba(255,184,0,0.3)'; d.style.background = 'rgba(255,184,0,0.1)'; }
-            else { d.style.color = 'var(--success)'; d.style.borderColor = 'rgba(0,255,136,0.3)'; d.style.background = 'rgba(0,255,136,0.1)'; }
+            if (v < 30) {
+                d.style.color = 'var(--danger)';
+                d.style.borderColor = 'rgba(255,107,107,0.3)';
+                d.style.background = 'rgba(255,107,107,0.1)';
+            } else if (v < 60) {
+                d.style.color = 'var(--warning)';
+                d.style.borderColor = 'rgba(255,184,0,0.3)';
+                d.style.background = 'rgba(255,184,0,0.1)';
+            } else {
+                d.style.color = 'var(--success)';
+                d.style.borderColor = 'rgba(0,255,136,0.3)';
+                d.style.background = 'rgba(0,255,136,0.1)';
+            }
         }
-        function getConfidenceValue() { return parseInt($('confidenceSlider').value); }
+
+        function getConfidenceValue() {
+            return parseInt($('confidenceSlider').value);
+        }
+
+        /* ============================================================
+           XSS SAFETY HELPER
+           ============================================================ */
+        function escHtml(str) {
+            if (str == null) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
 
         /* ============================================================
            INIT
            ============================================================ */
         document.addEventListener('DOMContentLoaded', () => {
-            document.querySelectorAll('.animate-in').forEach(el => el.style.animationFillMode = 'forwards');
+            document.querySelectorAll('.animate-in').forEach(el => {
+                el.style.animationFillMode = 'forwards';
+            });
+            updateConfidenceDisplay(); // Apply initial color to confidence display
         });
     </script>
 </body>

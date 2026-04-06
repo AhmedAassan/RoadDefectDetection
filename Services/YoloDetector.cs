@@ -9,13 +9,8 @@ namespace RoadDefectDetection.Services
 {
     /// <summary>
     /// Wraps a single YOLOv8 ONNX model. Includes enhanced NMS with:
-    /// 1. Per-class NMS (standard)
-    /// 2. Cross-class NMS (removes overlapping boxes of DIFFERENT classes)
-    /// 3. Minimum box size filtering
-    /// 4. Area-based duplicate removal
-    /// 
-    /// Now also carries ModelId and ClassIndex on each detection
-    /// for external system mapping.
+    /// per-class NMS, cross-class NMS, minimum box size filtering,
+    /// and area-based containment removal.
     /// </summary>
     public sealed class YoloDetector : IDisposable
     {
@@ -28,21 +23,8 @@ namespace RoadDefectDetection.Services
         private readonly int _inputSize;
         private bool _disposed;
 
-        /// <summary>
-        /// Cross-class IoU threshold. If two detections of DIFFERENT classes
-        /// overlap more than this, keep only the higher-confidence one.
-        /// </summary>
         private const float CrossClassIouThreshold = 0.60f;
-
-        /// <summary>
-        /// Minimum box dimension in pixels (original image space).
-        /// </summary>
         private const float MinBoxDimension = 8f;
-
-        /// <summary>
-        /// If one box contains more than this fraction of another box's area,
-        /// they're considered duplicates.
-        /// </summary>
         private const float ContainmentThreshold = 0.85f;
 
         public string ModelName => _modelName;
@@ -59,8 +41,7 @@ namespace RoadDefectDetection.Services
             int inputSize = 640)
         {
             if (!File.Exists(onnxPath))
-                throw new FileNotFoundException(
-                    $"ONNX model not found: {onnxPath}", onnxPath);
+                throw new FileNotFoundException($"ONNX model not found: {onnxPath}", onnxPath);
 
             _classNames = classNames ?? throw new ArgumentNullException(nameof(classNames));
             _confidenceThreshold = confidenceThreshold;
@@ -79,7 +60,7 @@ namespace RoadDefectDetection.Services
         public List<DetectionResult> Detect(byte[] imageBytes, float? confidenceOverride = null)
         {
             if (imageBytes == null || imageBytes.Length == 0)
-                throw new ArgumentException("Image bytes cannot be null or empty.");
+                throw new ArgumentException("Image bytes cannot be null or empty.", nameof(imageBytes));
 
             float activeConf = confidenceOverride ?? _confidenceThreshold;
 
@@ -135,11 +116,7 @@ namespace RoadDefectDetection.Services
                 for (int c = 1; c < numClasses; c++)
                 {
                     float conf = output[0, 4 + c, i];
-                    if (conf > bestConf)
-                    {
-                        bestConf = conf;
-                        bestClass = c;
-                    }
+                    if (conf > bestConf) { bestConf = conf; bestClass = c; }
                 }
 
                 if (bestConf < activeConf) continue;
@@ -154,13 +131,11 @@ namespace RoadDefectDetection.Services
                 float boxW = w * scaleX;
                 float boxH = h * scaleY;
 
-                // Clamp to image boundaries
                 x1 = Math.Max(0, x1);
                 y1 = Math.Max(0, y1);
                 boxW = Math.Min(boxW, origW - x1);
                 boxH = Math.Min(boxH, origH - y1);
 
-                // ── Filter: minimum box size ────────────────────
                 if (boxW < MinBoxDimension || boxH < MinBoxDimension)
                     continue;
 
@@ -171,38 +146,23 @@ namespace RoadDefectDetection.Services
                     ModelSource = _modelName,
                     ModelId = _modelId,
                     ClassIndex = bestClass,
-                    Box = new BoundingBox
-                    {
-                        X = x1,
-                        Y = y1,
-                        Width = boxW,
-                        Height = boxH
-                    }
+                    Box = new BoundingBox { X = x1, Y = y1, Width = boxW, Height = boxH }
                 });
             }
 
-            // ── Enhanced NMS pipeline ───────────────────────────
-            var afterPerClassNms = ApplyPerClassNms(rawDetections);
-            var afterCrossClassNms = ApplyCrossClassNms(afterPerClassNms);
-            var afterContainment = RemoveContainedBoxes(afterCrossClassNms);
+            var afterPerClass = ApplyPerClassNms(rawDetections);
+            var afterCrossClass = ApplyCrossClassNms(afterPerClass);
+            var afterContain = RemoveContainedBoxes(afterCrossClass);
 
-            return afterContainment;
+            return afterContain;
         }
 
-        /// <summary>
-        /// Standard per-class NMS: within each class, remove overlapping
-        /// boxes keeping the highest confidence one.
-        /// </summary>
-        private List<DetectionResult> ApplyPerClassNms(
-            List<DetectionResult> detections)
+        private List<DetectionResult> ApplyPerClassNms(List<DetectionResult> detections)
         {
             var results = new List<DetectionResult>();
-            var grouped = detections.GroupBy(d => d.Problem);
-
-            foreach (var group in grouped)
+            foreach (var group in detections.GroupBy(d => d.Problem))
             {
                 var sorted = group.OrderByDescending(d => d.Confidence).ToList();
-
                 while (sorted.Count > 0)
                 {
                     var best = sorted[0];
@@ -211,117 +171,69 @@ namespace RoadDefectDetection.Services
                     sorted.RemoveAll(d => ComputeIoU(best.Box, d.Box) > _iouThreshold);
                 }
             }
-
             return results;
         }
 
-        /// <summary>
-        /// Cross-class NMS: if two detections of DIFFERENT classes overlap
-        /// heavily, keep only the higher-confidence one.
-        /// </summary>
-        private List<DetectionResult> ApplyCrossClassNms(
-            List<DetectionResult> detections)
+        private List<DetectionResult> ApplyCrossClassNms(List<DetectionResult> detections)
         {
             if (detections.Count <= 1) return detections;
-
-            var sorted = detections
-                .OrderByDescending(d => d.Confidence)
-                .ToList();
+            var sorted = detections.OrderByDescending(d => d.Confidence).ToList();
             var keep = new List<DetectionResult>();
             var suppressed = new HashSet<int>();
-
             for (int i = 0; i < sorted.Count; i++)
             {
                 if (suppressed.Contains(i)) continue;
-
                 keep.Add(sorted[i]);
-
                 for (int j = i + 1; j < sorted.Count; j++)
                 {
-                    if (suppressed.Contains(j)) continue;
-
-                    float iou = ComputeIoU(sorted[i].Box, sorted[j].Box);
-                    if (iou > CrossClassIouThreshold)
-                    {
+                    if (!suppressed.Contains(j) &&
+                        ComputeIoU(sorted[i].Box, sorted[j].Box) > CrossClassIouThreshold)
                         suppressed.Add(j);
-                    }
                 }
             }
-
             return keep;
         }
 
-        /// <summary>
-        /// Containment check: if one box is almost entirely inside another,
-        /// keep only the higher-confidence one.
-        /// </summary>
-        private List<DetectionResult> RemoveContainedBoxes(
-            List<DetectionResult> detections)
+        private List<DetectionResult> RemoveContainedBoxes(List<DetectionResult> detections)
         {
             if (detections.Count <= 1) return detections;
-
-            var sorted = detections
-                .OrderByDescending(d => d.Confidence)
-                .ToList();
+            var sorted = detections.OrderByDescending(d => d.Confidence).ToList();
             var keep = new List<DetectionResult>();
             var suppressed = new HashSet<int>();
-
             for (int i = 0; i < sorted.Count; i++)
             {
                 if (suppressed.Contains(i)) continue;
                 keep.Add(sorted[i]);
-
                 for (int j = i + 1; j < sorted.Count; j++)
                 {
-                    if (suppressed.Contains(j)) continue;
-
-                    float containment = ComputeContainment(
-                        sorted[i].Box, sorted[j].Box);
-
-                    if (containment > ContainmentThreshold)
-                    {
+                    if (!suppressed.Contains(j) &&
+                        ComputeContainment(sorted[i].Box, sorted[j].Box) > ContainmentThreshold)
                         suppressed.Add(j);
-                    }
                 }
             }
-
             return keep;
         }
 
         private static float ComputeContainment(BoundingBox a, BoundingBox b)
         {
-            float x1 = Math.Max(a.X, b.X);
-            float y1 = Math.Max(a.Y, b.Y);
+            float x1 = Math.Max(a.X, b.X), y1 = Math.Max(a.Y, b.Y);
             float x2 = Math.Min(a.X + a.Width, b.X + b.Width);
             float y2 = Math.Min(a.Y + a.Height, b.Y + b.Height);
-
-            float interW = Math.Max(0, x2 - x1);
-            float interH = Math.Max(0, y2 - y1);
-            float interArea = interW * interH;
-
-            float areaA = a.Width * a.Height;
-            float areaB = b.Width * b.Height;
-            float smallerArea = Math.Min(areaA, areaB);
-
-            return smallerArea <= 0 ? 0f : interArea / smallerArea;
+            float iW = Math.Max(0, x2 - x1), iH = Math.Max(0, y2 - y1);
+            float inter = iW * iH;
+            float smaller = Math.Min(a.Width * a.Height, b.Width * b.Height);
+            return smaller <= 0 ? 0f : inter / smaller;
         }
 
         private static float ComputeIoU(BoundingBox a, BoundingBox b)
         {
-            float x1 = Math.Max(a.X, b.X);
-            float y1 = Math.Max(a.Y, b.Y);
+            float x1 = Math.Max(a.X, b.X), y1 = Math.Max(a.Y, b.Y);
             float x2 = Math.Min(a.X + a.Width, b.X + b.Width);
             float y2 = Math.Min(a.Y + a.Height, b.Y + b.Height);
-
-            float interW = Math.Max(0, x2 - x1);
-            float interH = Math.Max(0, y2 - y1);
-            float interArea = interW * interH;
-
-            float areaA = a.Width * a.Height;
-            float areaB = b.Width * b.Height;
-            float unionArea = areaA + areaB - interArea;
-
-            return unionArea <= 0 ? 0f : interArea / unionArea;
+            float iW = Math.Max(0, x2 - x1), iH = Math.Max(0, y2 - y1);
+            float inter = iW * iH;
+            float union = a.Width * a.Height + b.Width * b.Height - inter;
+            return union <= 0 ? 0f : inter / union;
         }
 
         public void Dispose()

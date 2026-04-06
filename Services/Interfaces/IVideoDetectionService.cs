@@ -3,28 +3,24 @@
 namespace RoadDefectDetection.Services.Interfaces
 {
     /// <summary>
-    /// Handles video-based road defect detection by extracting frames
-    /// and running the image detection pipeline on each selected frame.
+    /// Handles video-based road defect detection using OpenCV frame extraction.
     /// </summary>
     public interface IVideoDetectionService
     {
         /// <summary>
-        /// Analyzes a video file for road defects by extracting and 
-        /// processing frames at the specified interval.
+        /// Analyzes a video file for road defects by processing frames with OpenCV.
         /// </summary>
         /// <param name="videoBytes">Raw bytes of the video file.</param>
         /// <param name="videoName">Original file name for tracking.</param>
-        /// <param name="request">Processing parameters (frame interval, 
-        /// confidence, max frames).</param>
-        /// <param name="progress">Optional callback invoked after each 
-        /// frame is processed. Receives (currentFrame, totalFrames).</param>
-        /// <returns>A <see cref="VideoDetectionResponse"/> with all 
-        /// frame-level and summary results.</returns>
+        /// <param name="request">Processing parameters.</param>
+        /// <param name="progress">Optional progress callback (currentFrame, totalFrames).</param>
+        /// <param name="cancellationToken">Cancellation token for long-running operations.</param>
         Task<VideoDetectionResponse> DetectVideoAsync(
             byte[] videoBytes,
             string videoName,
             VideoDetectionRequest request,
-            Action<int, int>? progress = null);
+            Action<int, int>? progress = null,
+            CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Returns the list of video file extensions this service supports.
@@ -32,9 +28,10 @@ namespace RoadDefectDetection.Services.Interfaces
         string[] SupportedExtensions { get; }
 
         /// <summary>
-        /// Checks whether FFmpeg is available and the service can 
-        /// process videos.
+        /// Checks whether the OpenCV video backend is available.
+        /// This is synchronous because OpenCV is a native library — either
+        /// the package is installed or it is not.
         /// </summary>
-        Task<bool> IsAvailableAsync();
+        bool IsAvailable();
     }
 }

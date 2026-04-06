@@ -1,40 +1,61 @@
 ﻿using System.Collections.Concurrent;
+using Microsoft.Extensions.Options;
+using RoadDefectDetection.Configuration;
 
 namespace RoadDefectDetection.Services
 {
     /// <summary>
     /// Thread-safe in-memory cache for annotated video files.
-    /// Videos are stored temporarily and cleaned up after expiry.
+    /// Enforces:
+    ///   - Per-entry expiry (configurable, default 30 min)
+    ///   - Maximum entry count (default 10)
+    ///   - Maximum total cached size in MB (default 500 MB)
     /// 
-    /// In production, you'd use blob storage or disk-based caching.
-    /// For this project, in-memory is fine for reasonable video sizes.
+    /// When any limit is exceeded the oldest entries are evicted first.
     /// </summary>
     public sealed class AnnotatedVideoCache : IDisposable
     {
         private readonly ConcurrentDictionary<string, CachedVideo> _cache = new();
         private readonly Timer _cleanupTimer;
         private readonly ILogger<AnnotatedVideoCache> _logger;
-        private readonly TimeSpan _expiry = TimeSpan.FromMinutes(30);
+        private readonly TimeSpan _expiry;
+        private readonly int _maxEntries;
+        private readonly long _maxTotalBytes;
 
-        public AnnotatedVideoCache(ILogger<AnnotatedVideoCache> logger)
+        // Serialises eviction decisions to avoid races when multiple
+        // large videos arrive simultaneously.
+        private readonly SemaphoreSlim _evictionLock = new(1, 1);
+
+        public AnnotatedVideoCache(
+            IOptions<VideoProcessingSettings> options,
+            ILogger<AnnotatedVideoCache> logger)
         {
-            _logger = logger;
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            var settings = options?.Value ?? new VideoProcessingSettings();
+            _expiry = TimeSpan.FromMinutes(Math.Max(1, settings.CacheExpiryMinutes));
+            _maxEntries = Math.Max(1, settings.MaxCacheEntries);
+            _maxTotalBytes = (long)Math.Max(1, settings.MaxCacheTotalSizeMB) * 1024 * 1024;
 
-            // Run cleanup every 5 minutes
             _cleanupTimer = new Timer(
                 CleanupExpired, null,
                 TimeSpan.FromMinutes(5),
                 TimeSpan.FromMinutes(5));
+
+            _logger.LogInformation(
+                "AnnotatedVideoCache: expiry={Expiry}, maxEntries={Entries}, maxTotal={Total}MB",
+                _expiry, _maxEntries, settings.MaxCacheTotalSizeMB);
         }
 
         /// <summary>
-        /// Stores an annotated video and returns its unique ID.
+        /// Stores an annotated video and returns its unique cache ID.
+        /// Evicts oldest entries if size or count limits are breached.
         /// </summary>
         public string Store(byte[] videoBytes, string originalName, string contentType = "video/mp4")
         {
-            string id = Guid.NewGuid().ToString("N")[..12];
+            ArgumentNullException.ThrowIfNull(videoBytes);
 
-            var cached = new CachedVideo
+            string id = Guid.NewGuid().ToString("N")[..12];
+            var entry = new CachedVideo
             {
                 Id = id,
                 Data = videoBytes,
@@ -43,11 +64,13 @@ namespace RoadDefectDetection.Services
                 CreatedAt = DateTime.UtcNow
             };
 
-            _cache[id] = cached;
-
+            _cache[id] = entry;
             _logger.LogInformation(
-                "Cached annotated video '{Id}' ({Size:F1}MB) for '{Name}'. Cache size: {Count}",
-                id, videoBytes.Length / (1024.0 * 1024.0), originalName, _cache.Count);
+                "Cached annotated video '{Id}' ({Size:F1}MB) for '{Name}'.",
+                id, videoBytes.Length / (1024.0 * 1024.0), originalName);
+
+            // Evict if needed (best-effort, async)
+            _ = Task.Run(EnforceCapacityAsync);
 
             return id;
         }
@@ -60,49 +83,78 @@ namespace RoadDefectDetection.Services
             if (_cache.TryGetValue(id, out var cached))
             {
                 if (DateTime.UtcNow - cached.CreatedAt < _expiry)
-                {
                     return cached;
-                }
 
-                // Expired
                 _cache.TryRemove(id, out _);
-                _logger.LogDebug("Video '{Id}' expired.", id);
+                _logger.LogDebug("Video '{Id}' expired and removed.", id);
             }
-
             return null;
         }
 
-        /// <summary>
-        /// Removes a specific video from cache.
-        /// </summary>
-        public bool Remove(string id)
+        public bool Remove(string id) => _cache.TryRemove(id, out _);
+
+        // ── Private helpers ──────────────────────────────────────
+
+        private async Task EnforceCapacityAsync()
         {
-            return _cache.TryRemove(id, out _);
+            await _evictionLock.WaitAsync();
+            try
+            {
+                // Remove expired first
+                var now = DateTime.UtcNow;
+                var expired = _cache.Where(kvp => now - kvp.Value.CreatedAt >= _expiry)
+                                    .Select(kvp => kvp.Key).ToList();
+                foreach (var k in expired) _cache.TryRemove(k, out _);
+
+                // Then enforce count and size, oldest first
+                while (true)
+                {
+                    long totalBytes = _cache.Values.Sum(v => (long)v.Data.Length);
+                    int totalCount = _cache.Count;
+
+                    if (totalCount <= _maxEntries && totalBytes <= _maxTotalBytes)
+                        break;
+
+                    var oldest = _cache.Values
+                        .OrderBy(v => v.CreatedAt)
+                        .FirstOrDefault();
+
+                    if (oldest == null) break;
+
+                    if (_cache.TryRemove(oldest.Id, out _))
+                    {
+                        _logger.LogInformation(
+                            "Evicted cached video '{Id}' ({Size:F1}MB) to enforce capacity limits.",
+                            oldest.Id, oldest.Data.Length / (1024.0 * 1024.0));
+                    }
+                }
+            }
+            finally
+            {
+                _evictionLock.Release();
+            }
         }
 
         private void CleanupExpired(object? state)
         {
+            var now = DateTime.UtcNow;
             int removed = 0;
             foreach (var kvp in _cache)
             {
-                if (DateTime.UtcNow - kvp.Value.CreatedAt >= _expiry)
-                {
-                    if (_cache.TryRemove(kvp.Key, out _))
-                        removed++;
-                }
+                if (now - kvp.Value.CreatedAt >= _expiry &&
+                    _cache.TryRemove(kvp.Key, out _))
+                    removed++;
             }
-
             if (removed > 0)
-            {
                 _logger.LogInformation(
-                    "Cleaned up {Count} expired video(s). Remaining: {Remaining}",
+                    "Cleanup: removed {Count} expired video(s). Remaining: {R}",
                     removed, _cache.Count);
-            }
         }
 
         public void Dispose()
         {
-            _cleanupTimer?.Dispose();
+            _cleanupTimer.Dispose();
+            _evictionLock.Dispose();
             _cache.Clear();
         }
     }
